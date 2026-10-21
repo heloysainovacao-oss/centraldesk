@@ -17,6 +17,8 @@ const props = withDefaults(
     rows?: number
     /** Opções da lista quando `type` é 'select'. */
     options?: readonly string[]
+    /** Opções que aparecem na lista, mas não podem ser escolhidas. */
+    disabledOptions?: readonly string[]
     error?: string
   }>(),
   {
@@ -30,6 +32,7 @@ const props = withDefaults(
     dot: undefined,
     rows: 6,
     options: () => [],
+    disabledOptions: () => [],
     error: '',
   },
 )
@@ -68,7 +71,14 @@ const inputType = computed(() =>
         :aria-describedby="error || $slots.hint ? messageId : undefined"
       >
         <option value="" disabled>{{ placeholder ?? 'Selecione' }}</option>
-        <option v-for="option in options" :key="option" :value="option">{{ option }}</option>
+        <option
+          v-for="option in options"
+          :key="option"
+          :value="option"
+          :disabled="disabledOptions.includes(option)"
+        >
+          {{ option }}{{ disabledOptions.includes(option) ? ' (indisponível)' : '' }}
+        </option>
       </select>
       <textarea
         v-else-if="type === 'textarea'"

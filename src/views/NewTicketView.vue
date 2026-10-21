@@ -3,15 +3,9 @@ import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import FormField from '@/components/FormField.vue'
 import PrioritySelector from '@/components/PrioritySelector.vue'
-import {
-  CATEGORIES,
-  DEFAULT_SECTOR,
-  SECTORS,
-  TITLE_MAX_LENGTH,
-  categoryColor,
-  type PriorityId,
-} from '@/constants/tickets'
+import { SECTORS, TITLE_MAX_LENGTH, type PriorityId } from '@/constants/tickets'
 import { useAuthStore } from '@/stores/auth'
+import { useCategoriesStore } from '@/stores/categories'
 import { useTicketsStore } from '@/stores/tickets'
 
 const MIN_DESCRIPTION_LENGTH = 20
@@ -21,13 +15,17 @@ const tickets = useTicketsStore()
 const router = useRouter()
 
 const sectorNames = SECTORS.map((s) => s.name)
-const categoryNames = CATEGORIES.map((c) => c.name)
-// Enquanto só um setor estiver liberado, o campo fica travado nele.
-const sectorLocked = SECTORS.filter((s) => s.enabled).length <= 1
+const blockedSectors = SECTORS.filter((s) => !s.enabled).map((s) => s.name)
+const enabledSectors = SECTORS.filter((s) => s.enabled).map((s) => s.name)
+const categoriesStore = useCategoriesStore()
+// Só as categorias ativas podem ser escolhidas.
+const categoryNames = computed(() => categoriesStore.active.map((c) => c.name))
+// Se só um setor estiver liberado, o campo já vem escolhido e travado nele.
+const sectorLocked = enabledSectors.length === 1
 
 const form = reactive({
   title: '',
-  sector: DEFAULT_SECTOR as string,
+  sector: sectorLocked ? enabledSectors[0]! : '',
   category: '',
   priority: '' as PriorityId | '',
   description: '',
@@ -37,9 +35,11 @@ const attempted = ref(false)
 const submitting = ref(false)
 
 const errors = computed(() => {
-  if (!attempted.value) return { title: '', category: '', priority: '', description: '' }
+  if (!attempted.value)
+    return { title: '', sector: '', category: '', priority: '', description: '' }
   return {
     title: form.title.trim().length >= 5 ? '' : 'Dê um título curto que resuma o problema.',
+    sector: form.sector ? '' : 'Escolha o setor que vai atender o chamado.',
     category: form.category ? '' : 'Escolha uma categoria.',
     priority: form.priority ? '' : 'Escolha a prioridade.',
     description:
@@ -50,6 +50,10 @@ const errors = computed(() => {
 })
 
 const isDirty = computed(() => Boolean(form.title || form.category || form.description))
+
+const teamLabel = computed(() =>
+  form.sector ? `A equipe do setor ${form.sector}` : 'A equipe do setor escolhido',
+)
 
 function handleCancel() {
   if (isDirty.value && !window.confirm('Descartar este chamado? O que você escreveu será perdido.'))
@@ -87,9 +91,7 @@ async function handleSubmit() {
   <div class="layout">
     <section class="card form-card">
       <h1 class="page-title">Abrir chamado</h1>
-      <p class="page-subtitle">
-        Descreva o problema com detalhes. A equipe de Inovação será avisada.
-      </p>
+      <p class="page-subtitle">Descreva o problema com detalhes. {{ teamLabel }} será avisada.</p>
 
       <form class="ticket-form" novalidate @submit.prevent="handleSubmit">
         <FormField
@@ -107,20 +109,24 @@ async function handleSubmit() {
               v-model="form.sector"
               label="Setor de destino"
               type="select"
+              placeholder="Selecione o setor"
               :options="sectorNames"
+              :disabled-options="blockedSectors"
               :disabled="sectorLocked"
+              :error="errors.sector"
             />
             <FormField
               v-model="form.category"
               label="Categoria"
               type="select"
               :options="categoryNames"
-              :dot="categoryColor(form.category)"
+              :dot="form.category ? categoriesStore.colorOf(form.category) : undefined"
               :error="errors.category"
             />
           </div>
-          <p v-if="sectorLocked" class="ticket-form__note">
-            Por enquanto, os chamados vão para a equipe de Inovação.
+          <p class="ticket-form__note">
+            Escolha o setor responsável pelo assunto: Contábil, Fiscal, Departamento Pessoal,
+            Inovação (sistemas e equipamentos)…
           </p>
         </div>
 
@@ -157,8 +163,9 @@ async function handleSubmit() {
       <section class="card next">
         <h2>O que acontece depois</h2>
         <p>
-          Seu chamado entra na fila como <strong>Aberto</strong>. Quando alguém da Inovação assumir,
-          ele passa para <strong>Em andamento</strong> e vocês podem conversar pelos comentários.
+          Seu chamado entra na fila do setor escolhido como <strong>Aberto</strong>. Quando alguém
+          da equipe assumir, ele passa para <strong>Em andamento</strong> e vocês podem conversar
+          pelos comentários.
         </p>
       </section>
     </aside>

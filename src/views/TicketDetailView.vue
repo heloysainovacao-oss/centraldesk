@@ -3,9 +3,11 @@ import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import RatingCard from '@/components/RatingCard.vue'
 import TicketChat from '@/components/TicketChat.vue'
 import TicketTimeline from '@/components/TicketTimeline.vue'
-import { categoryColor, priorityById } from '@/constants/tickets'
+import { priorityById } from '@/constants/tickets'
+import { useCategoriesStore } from '@/stores/categories'
 import { useAuthStore } from '@/stores/auth'
 import { formatTicketNumber, useTicketsStore } from '@/stores/tickets'
 import { useUsersStore } from '@/stores/users'
@@ -13,6 +15,7 @@ import { formatDateTime, formatDuration } from '@/utils/format'
 import { initials } from '@/utils/user'
 
 const auth = useAuthStore()
+const categories = useCategoriesStore()
 const tickets = useTicketsStore()
 const users = useUsersStore()
 const route = useRoute()
@@ -42,7 +45,7 @@ const people = computed(() => {
     {
       label: 'Responsável',
       name: t.assigneeName,
-      detail: t.assigneeDepartment ?? (t.assigneeName ? 'Inovação' : undefined),
+      detail: t.assigneeDepartment,
       kind: 'analista',
     },
   ]
@@ -126,8 +129,8 @@ function confirmResolve() {
   <div v-else class="page">
     <div v-if="justCreated" class="success" role="status">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-      Chamado <strong>{{ formatTicketNumber(ticket.id) }}</strong> aberto. A equipe de Inovação já
-      foi avisada e pode falar com você por aqui.
+      Chamado <strong>{{ formatTicketNumber(ticket.id) }}</strong> aberto. A equipe do setor
+      {{ ticket.sector }} já foi avisada e pode falar com você por aqui.
     </div>
 
     <header class="head">
@@ -144,8 +147,19 @@ function confirmResolve() {
             Prioridade {{ priority.label.toLowerCase() }}
           </span>
           <span class="chip chip--plain">
-            <span class="chip__square" :style="{ background: categoryColor(ticket.category) }" />
+            <span
+              class="chip__square"
+              :style="{ background: categories.colorOf(ticket.category) }"
+            />
             {{ ticket.category }}
+          </span>
+          <span class="chip chip--sector" title="Setor de destino">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M8 8h3M8 12h3M8 16h3M3 21h18"
+              />
+            </svg>
+            <span class="sr-only">Setor de destino:</span> {{ ticket.sector }}
           </span>
         </div>
       </div>
@@ -180,6 +194,8 @@ function confirmResolve() {
           <h2 class="block__label">Descrição</h2>
           <p class="description">{{ ticket.description }}</p>
         </section>
+
+        <RatingCard v-if="ticket.status === 'resolvido'" :ticket="ticket" />
 
         <TicketChat :ticket="ticket" />
       </div>
@@ -229,7 +245,7 @@ function confirmResolve() {
         </select>
         <p class="dialog-note">A mudança fica registrada na conversa do chamado.</p>
       </template>
-      <p v-else>Não há outro analista ativo para receber este chamado.</p>
+      <p v-else>Não há outro administrador ativo para receber este chamado.</p>
     </ConfirmDialog>
 
     <ConfirmDialog
@@ -345,6 +361,18 @@ function confirmResolve() {
 
 .chip--plain {
   color: var(--navy-800);
+}
+
+.chip--sector {
+  border: 1px solid var(--card-border);
+  background: #fff;
+  color: var(--navy-800);
+}
+
+.chip--sector svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.8;
 }
 
 .chip__dot {

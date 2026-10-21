@@ -22,11 +22,12 @@ test('creates an account, logs out and logs back in', async ({ page }) => {
 
   await page.getByLabel('E-mail corporativo').fill('maria@contabilizape.com.br')
   await page.getByRole('button', { name: 'Criar conta' }).click()
-  await expect(page.getByRole('heading', { name: 'Meus chamados' })).toBeVisible()
+  // A primeira conta de um sistema sem administrador vira administradora.
+  await expect(page.getByRole('heading', { name: 'Fila de atendimento' })).toBeVisible()
 
-  await page.getByRole('link', { name: 'Novo chamado' }).click()
-  await expect(page.getByLabel('Setor de destino')).toBeDisabled()
-  await expect(page.getByLabel('Setor de destino')).toHaveValue('Inovação')
+  await page.goto('/chamados/novo')
+  await expect(page.getByLabel('Setor de destino')).toBeEnabled()
+  await page.getByLabel('Setor de destino').selectOption('Fiscal')
   await page.getByLabel('Título').fill('Notebook não liga após atualização')
   await page.getByLabel('Categoria').selectOption('Hardware')
   await page.getByText('Alta', { exact: true }).click()
@@ -47,7 +48,7 @@ test('creates an account, logs out and logs back in', async ({ page }) => {
   await expect(page.locator('.msg')).toContainText('Solicitante')
   await expect(composer).toHaveValue('')
 
-  await page.getByRole('link', { name: 'Meu perfil' }).first().click()
+  await page.goto('/perfil')
   await page.getByRole('button', { name: 'Sair da conta' }).click()
   await page.getByLabel('E-mail corporativo').fill('maria@contabilizape.com.br')
   await page.getByLabel('Senha', { exact: true }).fill('errada123')
@@ -56,5 +57,5 @@ test('creates an account, logs out and logs back in', async ({ page }) => {
 
   await page.getByLabel('Senha', { exact: true }).fill('SenhaForte1')
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await expect(page.getByRole('heading', { name: 'Meus chamados' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Fila de atendimento' })).toBeVisible()
 })

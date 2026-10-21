@@ -43,3 +43,6 @@ playwright-report/
 
 # Claude Code (configuração local)
 .claude/
+
+# Dados de teste locais (contas e chamados de exemplo), fora do repositório
+src/dev/

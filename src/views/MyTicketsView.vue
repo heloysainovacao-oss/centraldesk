@@ -2,14 +2,16 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { STATUSES, categoryColor, priorityById, type TicketStatus } from '@/constants/tickets'
+import { SECTORS, STATUSES, priorityById, type TicketStatus } from '@/constants/tickets'
 import { useAuthStore } from '@/stores/auth'
+import { useCategoriesStore } from '@/stores/categories'
 import { formatTicketNumber, useTicketsStore } from '@/stores/tickets'
 
 // `mine`: lista só os chamados abertos pela própria pessoa ("Chamados que abri" do analista).
 const props = defineProps<{ mine?: boolean }>()
 
 const auth = useAuthStore()
+const categories = useCategoriesStore()
 const tickets = useTicketsStore()
 
 // Na fila, o analista vê os chamados de todos; nos outros casos, só os próprios.
@@ -24,19 +26,28 @@ const heading = computed(() =>
   isQueue.value ? 'Fila de atendimento' : auth.isAnalyst ? 'Chamados que abri' : 'Meus chamados',
 )
 
+// Filtro por setor de destino (na fila de atendimento).
+const sectorFilter = ref('')
+const sectorOptions = computed(() =>
+  SECTORS.map((s) => s.name).filter((name) => list.value.some((t) => t.sector === name)),
+)
+const bySector = computed(() =>
+  sectorFilter.value ? list.value.filter((t) => t.sector === sectorFilter.value) : list.value,
+)
+
 const statusFilter = ref<TicketStatus | 'todos'>('todos')
 const filters = computed(() => [
-  { id: 'todos' as const, label: 'Todos', count: list.value.length },
+  { id: 'todos' as const, label: 'Todos', count: bySector.value.length },
   ...(Object.keys(STATUSES) as TicketStatus[]).map((id) => ({
     id,
     label: STATUSES[id].label,
-    count: list.value.filter((t) => t.status === id).length,
+    count: bySector.value.filter((t) => t.status === id).length,
   })),
 ])
 const visible = computed(() =>
   statusFilter.value === 'todos'
-    ? list.value
-    : list.value.filter((t) => t.status === statusFilter.value),
+    ? bySector.value
+    : bySector.value.filter((t) => t.status === statusFilter.value),
 )
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', {
@@ -58,7 +69,7 @@ function formatDate(iso: string) {
       <p class="page-subtitle">
         {{
           isQueue
-            ? 'Todos os chamados enviados para a Inovação. Clique em um chamado para conversar com o solicitante.'
+            ? 'Chamados enviados a todos os setores. Clique em um chamado para conversar com o solicitante.'
             : 'Acompanhe os chamados que você abriu e converse com a equipe de suporte.'
         }}
       </p>
@@ -68,18 +79,27 @@ function formatDate(iso: string) {
     </RouterLink>
   </header>
 
-  <div v-if="list.length" class="filters" role="group" aria-label="Filtrar por status">
-    <button
-      v-for="filter in filters"
-      :key="filter.id"
-      type="button"
-      class="filters__item"
-      :class="{ 'filters__item--active': statusFilter === filter.id }"
-      :aria-pressed="statusFilter === filter.id"
-      @click="statusFilter = filter.id"
-    >
-      {{ filter.label }} <span>{{ filter.count }}</span>
-    </button>
+  <div v-if="list.length" class="toolbar">
+    <div class="filters" role="group" aria-label="Filtrar por status">
+      <button
+        v-for="filter in filters"
+        :key="filter.id"
+        type="button"
+        class="filters__item"
+        :class="{ 'filters__item--active': statusFilter === filter.id }"
+        :aria-pressed="statusFilter === filter.id"
+        @click="statusFilter = filter.id"
+      >
+        {{ filter.label }} <span>{{ filter.count }}</span>
+      </button>
+    </div>
+    <label v-if="isQueue && sectorOptions.length > 1" class="sector-filter">
+      <span class="sr-only">Setor de destino</span>
+      <select v-model="sectorFilter">
+        <option value="">Todos os setores</option>
+        <option v-for="name in sectorOptions" :key="name" :value="name">{{ name }}</option>
+      </select>
+    </label>
   </div>
 
   <section v-if="list.length" class="card list" aria-label="Lista de chamados">
@@ -101,6 +121,7 @@ function formatDate(iso: string) {
           <span class="row__title">
             <span class="row__number">
               {{ formatTicketNumber(ticket.id) }}
+              <span class="row__sector">{{ ticket.sector }}</span>
               <span v-if="tickets.messageCount(ticket.id)" class="row__messages">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 5h16v11H8l-4 4z" />
@@ -116,29 +137,45 @@ function formatDate(iso: string) {
             <small v-if="ticket.authorDepartment">{{ ticket.authorDepartment }}</small>
           </span>
           <span class="row__cell">
-            <span class="dot" :style="{ background: categoryColor(ticket.category) }" />
+            <span class="dot" :style="{ background: categories.colorOf(ticket.category) }" />
             {{ ticket.category }}
           </span>
           <span class="row__cell">
             <span class="dot" :style="{ background: priorityById(ticket.priority).color }" />
             {{ priorityById(ticket.priority).label }}
           </span>
-          <span><StatusBadge :status="ticket.status" /></span>
+          <span class="row__status">
+            <StatusBadge :status="ticket.status" />
+            <span
+              v-if="!isQueue && tickets.awaitingRating(ticket)"
+              class="row__rate"
+              title="Avalie o atendimento deste chamado"
+            >
+              ★ Avaliar
+            </span>
+            <span
+              v-else-if="ticket.rating"
+              class="row__rated"
+              :title="`Avaliado com ${ticket.rating} de 5`"
+            >
+              ★ {{ ticket.rating }}
+            </span>
+          </span>
           <span class="row__date">{{ formatDate(ticket.createdAt) }}</span>
         </RouterLink>
       </li>
     </ul>
-    <p v-if="!visible.length" class="list__empty">Nenhum chamado com este status.</p>
+    <p v-if="!visible.length" class="list__empty">Nenhum chamado com esses filtros.</p>
   </section>
 
   <section v-else class="card empty">
     <template v-if="isQueue">
       <h2>A fila está vazia</h2>
-      <p>Quando alguém abrir um chamado para a Inovação, ele aparece aqui.</p>
+      <p>Quando alguém abrir um chamado para qualquer setor, ele aparece aqui.</p>
     </template>
     <template v-else>
       <h2>Você ainda não abriu nenhum chamado</h2>
-      <p>Quando algo não estiver funcionando, abra um chamado e a equipe de Inovação vai ajudar.</p>
+      <p>Quando precisar de ajuda, abra um chamado para o setor responsável.</p>
       <RouterLink :to="{ name: 'new-ticket' }" class="btn btn--primary">Abrir chamado</RouterLink>
     </template>
   </section>
@@ -155,11 +192,68 @@ function formatDate(iso: string) {
   margin-bottom: 20px;
 }
 
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 1140px;
+  margin-bottom: 16px;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+}
+
+.sector-filter select {
+  height: 36px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230b2269' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 12px center / 14px;
+  color: var(--navy-800);
+  font-size: 0.875rem;
+  font-weight: 600;
+  appearance: none;
+  cursor: pointer;
+}
+
+.row__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.row__rate {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fdf1d6;
+  color: #8a5a00;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.row__rated {
+  color: #8a5a00;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.row__sector {
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: #eef1f6;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
 }
 
 .filters__item {

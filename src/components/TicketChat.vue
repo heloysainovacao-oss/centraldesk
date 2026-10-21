@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from 'vue'
-import { ROLE_LABELS, useAuthStore } from '@/stores/auth'
+import { ROLE_LABELS, isStaffRole, normalizeRole, useAuthStore } from '@/stores/auth'
 import { useTicketsStore, type Ticket, type TicketMessage } from '@/stores/tickets'
 import { formatRelativeDay, formatShortTime } from '@/utils/format'
 import { initials } from '@/utils/user'
@@ -29,7 +29,7 @@ const placeholder = computed(() =>
 function roleInTicket(message: TicketMessage) {
   if (message.authorEmail === props.ticket.authorEmail) return 'Solicitante'
   if (message.authorEmail === props.ticket.assigneeEmail) return 'Responsável'
-  return ROLE_LABELS[message.authorRole]
+  return ROLE_LABELS[normalizeRole(message.authorRole)]
 }
 
 function isMine(message: TicketMessage) {
@@ -84,7 +84,10 @@ watch(
         <article
           v-else
           class="msg"
-          :class="[`msg--${message.authorRole}`, { 'msg--mine': isMine(message) }]"
+          :class="[
+            isStaffRole(message.authorRole) ? 'msg--analista' : 'msg--usuario',
+            { 'msg--mine': isMine(message) },
+          ]"
         >
           <span class="msg__avatar" aria-hidden="true">{{ initials(message.authorName) }}</span>
           <div class="msg__content">

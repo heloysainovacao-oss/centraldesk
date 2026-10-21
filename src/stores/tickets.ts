@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { PriorityId, TicketStatus } from '@/constants/tickets'
-import type { User, UserRole } from './auth'
+import { isStaffRole, type User, type UserRole } from './auth'
 
 // Chamados e mensagens salvos só no navegador (localStorage), como a autenticação provisória.
 // Deve ser trocado por uma API real junto com o login.
@@ -26,6 +26,12 @@ export interface Ticket {
   assignedAt?: string
   /** Quando foi encerrado. */
   resolvedAt?: string
+  /** Avaliação do atendimento pelo solicitante, de 1 a 5 estrelas. */
+  rating?: number
+  ratingComment?: string
+  ratedAt?: string
+  /** O solicitante escolheu "Pular avaliação". */
+  ratingSkipped?: boolean
   updatedAt?: string
 }
 
@@ -200,9 +206,69 @@ export const useTicketsStore = defineStore('tickets', () => {
     pushMessage(ticketId, analyst, `Chamado encerrado por ${analyst.name}`, 'evento')
   }
 
+  /**
+   * Depois de anonimizar uma conta, troca o nome e o e-mail dela nos chamados e mensagens.
+   * O histórico continua, mas sem dados pessoais.
+   */
+  function anonymizePerson(oldEmail: string, newEmail: string, name: string) {
+    tickets.value = tickets.value.map((t) => ({
+      ...t,
+      ...(t.authorEmail === oldEmail && { authorEmail: newEmail, authorName: name }),
+      ...(t.assigneeEmail === oldEmail && { assigneeEmail: newEmail, assigneeName: name }),
+    }))
+    messages.value = messages.value.map((m) =>
+      m.authorEmail === oldEmail ? { ...m, authorEmail: newEmail, authorName: name } : m,
+    )
+    saveTickets()
+    saveMessages()
+  }
+
+  /** O chamado está encerrado e o solicitante ainda não avaliou nem pulou a avaliação? */
+  function awaitingRating(ticket: Ticket): boolean {
+    return ticket.status === 'resolvido' && !ticket.rating && !ticket.ratingSkipped
+  }
+
+  /**
+   * O solicitante avalia o atendimento (1 a 5 estrelas, comentário opcional).
+   * Só vale para chamados encerrados, uma única vez.
+   */
+  function rate(ticketId: number, author: User, stars: number, comment = ''): boolean {
+    const ticket = ticketById(ticketId)
+    if (!ticket || ticket.authorEmail !== author.email || !awaitingRating(ticket)) return false
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) return false
+    updateTicket(ticketId, {
+      rating: stars,
+      ratingComment: comment.trim() || undefined,
+      ratedAt: new Date().toISOString(),
+    })
+    return true
+  }
+
+  /** O solicitante prefere não avaliar este chamado. */
+  function skipRating(ticketId: number, author: User): boolean {
+    const ticket = ticketById(ticketId)
+    if (!ticket || ticket.authorEmail !== author.email || !awaitingRating(ticket)) return false
+    updateTicket(ticketId, { ratingSkipped: true })
+    return true
+  }
+
+  /** Quantos chamados usam a categoria. */
+  function categoryUsage(name: string): number {
+    return tickets.value.filter((t) => t.category === name).length
+  }
+
+  /** Quando uma categoria é renomeada, os chamados dela passam a usar o novo nome. */
+  function renameCategory(oldName: string, newName: string) {
+    if (oldName === newName) return
+    tickets.value = tickets.value.map((t) =>
+      t.category === oldName ? { ...t, category: newName } : t,
+    )
+    saveTickets()
+  }
+
   /** Primeira resposta da equipe de suporte (mensagem ou assumir), usada no "Tempo de resposta". */
   function firstResponseAt(ticketId: number): string | undefined {
-    return messagesFor(ticketId).find((m) => m.authorRole === 'analista')?.createdAt
+    return messagesFor(ticketId).find((m) => isStaffRole(m.authorRole))?.createdAt
   }
 
   return {
@@ -219,5 +285,11 @@ export const useTicketsStore = defineStore('tickets', () => {
     reassign,
     resolve,
     firstResponseAt,
+    anonymizePerson,
+    categoryUsage,
+    awaitingRating,
+    rate,
+    skipRating,
+    renameCategory,
   }
 })

@@ -1,10 +1,16 @@
-// Setores que podem receber chamados. Para liberar um novo setor no futuro,
-// adicione-o aqui e marque `enabled: true`.
-export const SECTORS = [{ name: 'Inovação', enabled: true }] as const
+import { DEPARTMENTS } from './departments'
 
-export const DEFAULT_SECTOR = 'Inovação'
+// Setores que podem receber chamados: todos os setores da empresa.
+// Para bloquear um setor temporariamente, marque `enabled: false`
+// (ele aparece na lista, mas não pode ser escolhido).
+export const SECTORS: readonly { name: string; enabled: boolean }[] = DEPARTMENTS.map((name) => ({
+  name,
+  enabled: true,
+}))
 
-export const CATEGORIES = [
+// Categorias iniciais. Depois, os administradores gerenciam as categorias na tela
+// "Categorias" (src/stores/categories.ts).
+export const DEFAULT_CATEGORIES = [
   { name: 'Hardware', color: '#e5484d' },
   { name: 'Software', color: '#1f9de6' },
   { name: 'Acesso e senhas', color: '#f5a524' },
@@ -13,29 +19,28 @@ export const CATEGORIES = [
   { name: 'Outros', color: '#8a91a3' },
 ] as const
 
-export type CategoryName = (typeof CATEGORIES)[number]['name']
-
+// Cores validadas para daltonismo (usadas também no gráfico de prioridades do painel).
 export const PRIORITIES = [
   {
     id: 'baixa',
     label: 'Baixa',
-    color: '#8a91a3',
-    tint: '#eef0f4',
-    text: '#4d5566',
+    color: '#1baf7a',
+    tint: '#e1f5ec',
+    text: '#0e6b4a',
     hint: 'pode esperar alguns dias.',
   },
   {
     id: 'media',
     label: 'Média',
-    color: '#1f9de6',
-    tint: '#e3f2fc',
-    text: '#0f6aa3',
+    color: '#2a78d6',
+    tint: '#e3eefb',
+    text: '#1c5cab',
     hint: 'atrapalha, mas dá para contornar.',
   },
   {
     id: 'alta',
     label: 'Alta',
-    color: '#f5a524',
+    color: '#eda100',
     tint: '#fdf1d6',
     text: '#8a5a00',
     hint: 'impede uma tarefa importante.',
@@ -43,9 +48,9 @@ export const PRIORITIES = [
   {
     id: 'critica',
     label: 'Crítica',
-    color: '#e8553a',
-    tint: '#fde6e0',
-    text: '#a83a22',
+    color: '#e34948',
+    tint: '#fde6e6',
+    text: '#a32b2a',
     hint: 'para o trabalho de várias pessoas ou um prazo urgente.',
   },
 ] as const
@@ -61,10 +66,6 @@ export const STATUSES = {
 export type TicketStatus = keyof typeof STATUSES
 
 export const TITLE_MAX_LENGTH = 120
-
-export function categoryColor(name: string): string | undefined {
-  return CATEGORIES.find((c) => c.name === name)?.color
-}
 
 export function priorityById(id: PriorityId) {
   return PRIORITIES.find((p) => p.id === id)!

@@ -57,14 +57,18 @@ const subtitle = computed(() =>
         </RouterLink>
 
         <p class="sidebar__section">Administração</p>
-        <span class="sidebar__link sidebar__link--soon" aria-disabled="true" title="Em breve">
+        <RouterLink
+          :to="{ name: 'metrics' }"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 20h16M7 20v-6M12 20V8M17 20v-9" />
           </svg>
           Painel de métricas
-          <span class="sr-only">(em breve)</span>
-        </span>
+        </RouterLink>
         <RouterLink
+          v-if="auth.isAdmin"
           :to="{ name: 'users' }"
           class="sidebar__link"
           active-class="sidebar__link--active"
@@ -77,14 +81,18 @@ const subtitle = computed(() =>
           </svg>
           Usuários
         </RouterLink>
-        <span class="sidebar__link sidebar__link--soon" aria-disabled="true" title="Em breve">
+        <RouterLink
+          v-if="auth.isAdmin"
+          :to="{ name: 'categories' }"
+          class="sidebar__link"
+          active-class="sidebar__link--active"
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />
             <circle cx="8" cy="8" r="1.5" />
           </svg>
           Categorias
-          <span class="sr-only">(em breve)</span>
-        </span>
+        </RouterLink>
       </nav>
 
       <!-- Usuário comum -->

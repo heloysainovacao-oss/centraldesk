@@ -25,7 +25,7 @@ const ana: User = {
   email: 'ana@contabilizape.com.br',
   cpf: '11144477735',
   department: 'Inovação',
-  role: 'analista',
+  role: 'admin',
   active: true,
 }
 
@@ -83,7 +83,7 @@ describe('ticket chat', () => {
 
     expect(store.messagesFor(ticket.id)).toMatchObject([
       { authorName: 'Maria Silva', authorRole: 'usuario', body: 'Oi, alguém pode ajudar?' },
-      { authorName: 'Ana Suporte', authorRole: 'analista', kind: 'mensagem' },
+      { authorName: 'Ana Suporte', authorRole: 'admin', kind: 'mensagem' },
     ])
     expect(store.messageCount(ticket.id)).toBe(2)
   })
@@ -145,5 +145,54 @@ describe('ticket chat', () => {
 
     const reply = store.sendMessage(ticket.id, ana, 'Estou vendo!')
     expect(store.firstResponseAt(ticket.id)).toBe(reply?.createdAt)
+  })
+})
+
+describe('ticket rating', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
+
+  function closedTicket() {
+    const store = useTicketsStore()
+    const ticket = store.create(draft, maria)
+    store.assign(ticket.id, ana)
+    store.resolve(ticket.id, ana)
+    return { store, id: ticket.id }
+  }
+
+  it('only allows rating after the ticket is closed', () => {
+    const store = useTicketsStore()
+    const ticket = store.create(draft, maria)
+    expect(store.rate(ticket.id, maria, 5)).toBe(false)
+    expect(store.awaitingRating(store.ticketById(ticket.id)!)).toBe(false)
+  })
+
+  it('lets the requester rate once, with an optional comment', () => {
+    const { store, id } = closedTicket()
+    expect(store.awaitingRating(store.ticketById(id)!)).toBe(true)
+
+    expect(store.rate(id, maria, 4, '  Bom atendimento ')).toBe(true)
+    expect(store.ticketById(id)).toMatchObject({ rating: 4, ratingComment: 'Bom atendimento' })
+    expect(store.ticketById(id)?.ratedAt).toBeTruthy()
+
+    expect(store.rate(id, maria, 1)).toBe(false)
+    expect(store.ticketById(id)?.rating).toBe(4)
+  })
+
+  it('does not let other people rate, nor invalid scores', () => {
+    const { store, id } = closedTicket()
+    expect(store.rate(id, ana, 5)).toBe(false)
+    expect(store.rate(id, maria, 0)).toBe(false)
+    expect(store.rate(id, maria, 6)).toBe(false)
+    expect(store.rate(id, maria, 3.5)).toBe(false)
+  })
+
+  it('lets the requester skip the rating', () => {
+    const { store, id } = closedTicket()
+    expect(store.skipRating(id, maria)).toBe(true)
+    expect(store.awaitingRating(store.ticketById(id)!)).toBe(false)
+    expect(store.rate(id, maria, 5)).toBe(false)
   })
 })

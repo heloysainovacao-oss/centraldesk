@@ -25,10 +25,21 @@ describe('auth store', () => {
       cpf: '52998224725',
       department: 'Inovação',
       email: 'maria@contabilizape.com.br',
-      role: 'usuario',
       active: true,
     })
     expect(auth.currentUser?.createdAt).toBeTruthy()
+  })
+
+  it('makes the first account an administrator, and the next ones regular users', async () => {
+    const auth = useAuthStore()
+    await auth.register(maria)
+    expect(auth.currentUser?.role).toBe('admin')
+    expect(auth.isAdmin).toBe(true)
+    expect(auth.isAnalyst).toBe(true)
+
+    auth.logout()
+    await auth.register({ ...maria, email: 'joao@contabilizape.com.br', cpf: '111.444.777-35' })
+    expect(auth.currentUser?.role).toBe('usuario')
     expect(auth.isAnalyst).toBe(false)
   })
 

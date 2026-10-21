@@ -32,10 +32,22 @@ const router = createRouter({
         },
         { path: 'perfil', name: 'profile', component: () => import('../views/ProfileView.vue') },
         {
+          path: 'metricas',
+          name: 'metrics',
+          component: () => import('../views/MetricsView.vue'),
+          meta: { analystOnly: true },
+        },
+        {
+          path: 'categorias',
+          name: 'categories',
+          component: () => import('../views/CategoriesView.vue'),
+          meta: { adminOnly: true },
+        },
+        {
           path: 'usuarios',
           name: 'users',
           component: () => import('../views/UsersView.vue'),
-          meta: { analystOnly: true },
+          meta: { adminOnly: true },
         },
       ],
     },
@@ -67,6 +79,9 @@ router.beforeEach((to) => {
     return { name: 'tickets' }
   }
   if (to.meta.analystOnly && !auth.isAnalyst) {
+    return { name: 'tickets' }
+  }
+  if (to.meta.adminOnly && !auth.isAdmin) {
     return { name: 'tickets' }
   }
 })

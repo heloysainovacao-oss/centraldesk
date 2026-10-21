@@ -7,11 +7,28 @@ import { onlyDigits } from '@/utils/cpf'
 
 export const CORPORATE_DOMAIN = 'contabilizape.com.br'
 
-export type UserRole = 'usuario' | 'analista'
+/**
+ * - usuario: abre e acompanha os próprios chamados.
+ * - admin: equipe de suporte. Atende chamados (fila, chat, métricas) e gerencia usuários.
+ *
+ * Contas antigas com o perfil "analista" são tratadas como administradoras:
+ * no sistema, analista e administrador são a mesma coisa.
+ */
+export type UserRole = 'usuario' | 'admin'
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   usuario: 'Usuário',
-  analista: 'Analista de suporte',
+  admin: 'Administrador',
+}
+
+/** Converte perfis de versões anteriores ("analista") para os perfis atuais. */
+export function normalizeRole(role: string | undefined): UserRole {
+  return role === 'admin' || role === 'analista' ? 'admin' : 'usuario'
+}
+
+/** Perfil da equipe de suporte (atende chamados). Aceita perfis antigos salvos. */
+export function isStaffRole(role: string | undefined): boolean {
+  return normalizeRole(role) === 'admin'
 }
 
 export interface User {
@@ -23,9 +40,13 @@ export interface User {
   /** Contas inativas não conseguem entrar no sistema. */
   active: boolean
   createdAt?: string
+  /** Quando os dados pessoais foram removidos (a conta fica só como histórico). */
+  anonymizedAt?: string
 }
 
-export type RegisterData = Omit<User, 'role' | 'active' | 'createdAt'> & { password: string }
+export type RegisterData = Pick<User, 'name' | 'email' | 'cpf' | 'department'> & {
+  password: string
+}
 
 export type RegisterResult = 'ok' | 'email-taken' | 'cpf-taken'
 export type LoginResult = 'ok' | 'invalid' | 'inactive'
@@ -38,7 +59,7 @@ export const USERS_KEY = 'centraldesk:users'
 const SESSION_KEY = 'centraldesk:session'
 
 // A sessão fica no sessionStorage: cada aba tem o próprio login. Assim dá para testar o chat
-// com o usuário numa aba e o analista em outra.
+// com o usuário numa aba e o administrador em outra.
 const sessionStore = () => sessionStorage
 
 function readJson<T>(key: string, fallback: T, storage: Storage = localStorage): T {
@@ -70,13 +91,16 @@ export function normalizeEmail(email: string): string {
 
 /** Contas antigas (antes de perfis e status existirem) viram usuários comuns e ativos. */
 export function toPublicUser({ passwordHash: _, ...user }: StoredUser): User {
-  return { ...user, role: user.role ?? 'usuario', active: user.active ?? true }
+  return { ...user, role: normalizeRole(user.role), active: user.active ?? true }
 }
 
 export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref<User | null>(readJson<User | null>(SESSION_KEY, null, sessionStore()))
   const isAuthenticated = computed(() => currentUser.value !== null)
-  const isAnalyst = computed(() => currentUser.value?.role === 'analista')
+  /** Administradores: atendem chamados e gerenciam usuários. */
+  const isAdmin = computed(() => !!currentUser.value && isStaffRole(currentUser.value.role))
+  /** Mesmo que `isAdmin` (analista e administrador são o mesmo perfil). */
+  const isAnalyst = isAdmin
 
   function setSession(user: User | null) {
     currentUser.value = user
@@ -91,12 +115,15 @@ export const useAuthStore = defineStore('auth', () => {
     if (users.some((u) => u.email === email)) return 'email-taken'
     if (users.some((u) => u.cpf === cpf)) return 'cpf-taken'
 
+    // A primeira conta de um sistema sem administrador vira administradora,
+    // para que alguém possa gerenciar as demais.
+    const hasAdmin = users.some((u) => isStaffRole(u.role) && u.active !== false)
     const user: User = {
       name: data.name.trim(),
       email,
       cpf,
       department: data.department,
-      role: 'usuario',
+      role: hasAdmin ? 'usuario' : 'admin',
       active: true,
       createdAt: new Date().toISOString(),
     }
@@ -116,7 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Confere se a conta logada ainda existe e está ativa (um analista pode ter desativado ou
+   * Confere se a conta logada ainda existe e está ativa (um administrador pode ter desativado ou
    * excluído a conta). Se não, encerra a sessão. Também atualiza dados que mudaram.
    */
   function refreshSession(): boolean {
@@ -135,5 +162,14 @@ export const useAuthStore = defineStore('auth', () => {
     setSession(null)
   }
 
-  return { currentUser, isAuthenticated, isAnalyst, register, login, refreshSession, logout }
+  return {
+    currentUser,
+    isAuthenticated,
+    isAnalyst,
+    isAdmin,
+    register,
+    login,
+    refreshSession,
+    logout,
+  }
 })

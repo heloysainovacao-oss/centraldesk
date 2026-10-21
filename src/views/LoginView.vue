@@ -39,6 +39,22 @@ function goToApp() {
   const redirect = route.query.redirect
   router.push(typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/')
 }
+
+// Atalho de teste: aparece só em desenvolvimento e só se existir src/dev/seed.ts (fora do Git).
+type DemoAccount = { email: string; password: string }
+type DemoModule = { DEMO_USER: DemoAccount; DEMO_ADMIN: DemoAccount }
+// O `if` garante que nada disso vá para o site publicado.
+let demoLoader: (() => Promise<DemoModule>) | undefined
+if (import.meta.env.DEV) {
+  demoLoader = import.meta.glob<DemoModule>('../dev/seed.ts')['../dev/seed.ts']
+}
+
+async function loginAsDemo(profile: 'usuario' | 'admin') {
+  if (!demoLoader) return
+  const accounts = await demoLoader()
+  const demo = profile === 'admin' ? accounts.DEMO_ADMIN : accounts.DEMO_USER
+  if ((await auth.login(demo.email, demo.password)) === 'ok') goToApp()
+}
 </script>
 
 <template>
@@ -95,10 +111,62 @@ function goToApp() {
       Ainda não tem conta?
       <RouterLink :to="{ name: 'register' }">Criar conta</RouterLink>
     </p>
+
+    <div v-if="demoLoader" class="dev-login">
+      <span class="dev-login__tag">Modo de teste</span>
+      <div class="dev-login__buttons">
+        <button type="button" class="dev-login__button" @click="loginAsDemo('usuario')">
+          Entrar como usuário
+        </button>
+        <button type="button" class="dev-login__button" @click="loginAsDemo('admin')">
+          Entrar como administrador
+        </button>
+      </div>
+    </div>
   </AuthLayout>
 </template>
 
 <style scoped>
+.dev-login {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 32px;
+  padding: 16px;
+  border: 1px dashed #c7cedb;
+  border-radius: var(--radius);
+}
+
+.dev-login__tag {
+  color: var(--text-soft);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dev-login__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dev-login__button {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--navy-800);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dev-login__button:hover {
+  background: #f0f2f7;
+}
+
 .pitch {
   max-width: 460px;
 }

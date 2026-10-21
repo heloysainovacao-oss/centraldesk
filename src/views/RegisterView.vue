@@ -5,19 +5,8 @@ import AuthLayout from '@/components/AuthLayout.vue'
 import FormField from '@/components/FormField.vue'
 import { CORPORATE_DOMAIN, normalizeEmail, useAuthStore } from '@/stores/auth'
 import { formatCpf, isValidCpf } from '@/utils/cpf'
+import { DEPARTMENTS } from '@/constants/departments'
 import { MIN_PASSWORD_LENGTH, STRENGTH_LABELS, passwordStrength } from '@/utils/password'
-
-const DEPARTMENTS = [
-  'Administrativo',
-  'Comercial',
-  'Contábil',
-  'Departamento Pessoal',
-  'Financeiro',
-  'Fiscal',
-  'Inovação',
-  'Recursos Humanos',
-  'Societário',
-] as const
 
 const steps = [
   'Preencha seus dados e o seu departamento.',
