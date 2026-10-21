@@ -27,7 +27,7 @@ function handleLogout() {
 
 <template>
   <h1 class="page-title">Meu perfil</h1>
-  <p class="page-subtitle">Seus dados de cadastro no CentralDesk.</p>
+  <p class="page-subtitle">Seus dados de cadastro no Central-Desk.</p>
 
   <section class="card profile">
     <dl>

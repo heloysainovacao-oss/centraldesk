@@ -26,7 +26,7 @@ const subtitle = computed(() =>
   <div class="app">
     <aside class="sidebar">
       <RouterLink :to="{ name: 'tickets' }" class="sidebar__brand" aria-label="Início">
-        <BrandLogo />
+        <BrandLogo compact />
       </RouterLink>
 
       <RouterLink v-if="!auth.isAnalyst" :to="{ name: 'new-ticket' }" class="sidebar__cta">
@@ -425,7 +425,7 @@ const subtitle = computed(() =>
 }
 
 @media (max-width: 420px) {
-  .sidebar :deep(.brand__name) {
+  .sidebar :deep(.brand__text) {
     display: none;
   }
 }
