@@ -22,9 +22,33 @@ test('creates an account, logs out and logs back in', async ({ page }) => {
 
   await page.getByLabel('E-mail corporativo').fill('maria@contabilizape.com.br')
   await page.getByRole('button', { name: 'Criar conta' }).click()
-  await expect(page.getByRole('heading', { name: 'Olá, Maria Teste!' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Meus chamados' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Sair' }).click()
+  await page.getByRole('link', { name: 'Novo chamado' }).click()
+  await expect(page.getByLabel('Setor de destino')).toBeDisabled()
+  await expect(page.getByLabel('Setor de destino')).toHaveValue('Inovação')
+  await page.getByLabel('Título').fill('Notebook não liga após atualização')
+  await page.getByLabel('Categoria').selectOption('Hardware')
+  await page.getByText('Alta', { exact: true }).click()
+  await page.getByLabel('Descrição').fill('Depois da atualização o notebook não passa do logo.')
+  await page.getByRole('button', { name: 'Abrir chamado' }).click()
+  await expect(page.getByRole('status')).toContainText('#0001')
+  await expect(
+    page.getByRole('heading', { name: 'Notebook não liga após atualização' }),
+  ).toBeVisible()
+
+  // Chat: Enter quebra a linha, Ctrl + Enter envia.
+  const composer = page.getByLabel('Escreva uma mensagem')
+  await composer.fill('Alguém pode me ajudar hoje?')
+  await composer.press('Enter')
+  await expect(page.locator('.msg')).toHaveCount(0)
+  await composer.press('Control+Enter')
+  await expect(page.locator('.msg')).toHaveCount(1)
+  await expect(page.locator('.msg')).toContainText('Solicitante')
+  await expect(composer).toHaveValue('')
+
+  await page.getByRole('link', { name: 'Meu perfil' }).first().click()
+  await page.getByRole('button', { name: 'Sair da conta' }).click()
   await page.getByLabel('E-mail corporativo').fill('maria@contabilizape.com.br')
   await page.getByLabel('Senha', { exact: true }).fill('errada123')
   await page.getByRole('button', { name: 'Entrar' }).click()
@@ -32,5 +56,5 @@ test('creates an account, logs out and logs back in', async ({ page }) => {
 
   await page.getByLabel('Senha', { exact: true }).fill('SenhaForte1')
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await expect(page.getByRole('heading', { name: 'Olá, Maria Teste!' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Meus chamados' })).toBeVisible()
 })

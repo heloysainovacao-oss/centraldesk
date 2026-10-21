@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { useAuthStore, type RegisterData } from '../auth'
+import { readStoredUsers, useAuthStore, writeStoredUsers, type RegisterData } from '../auth'
 
 const maria: RegisterData = {
   name: 'Maria Silva',
@@ -13,18 +13,23 @@ const maria: RegisterData = {
 describe('auth store', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     setActivePinia(createPinia())
   })
 
   it('registers a user and starts a session', async () => {
     const auth = useAuthStore()
     expect(await auth.register(maria)).toBe('ok')
-    expect(auth.currentUser).toEqual({
+    expect(auth.currentUser).toMatchObject({
       name: 'Maria Silva',
       cpf: '52998224725',
       department: 'Inovação',
       email: 'maria@contabilizape.com.br',
+      role: 'usuario',
+      active: true,
     })
+    expect(auth.currentUser?.createdAt).toBeTruthy()
+    expect(auth.isAnalyst).toBe(false)
   })
 
   it('rejects a duplicate e-mail or CPF', async () => {
@@ -39,9 +44,22 @@ describe('auth store', () => {
     await auth.register(maria)
     auth.logout()
 
-    expect(await auth.login('maria@contabilizape.com.br', 'errada')).toBe(false)
+    expect(await auth.login('maria@contabilizape.com.br', 'errada')).toBe('invalid')
     expect(auth.isAuthenticated).toBe(false)
-    expect(await auth.login(' MARIA@contabilizape.com.br ', 'senha-forte')).toBe(true)
+    expect(await auth.login(' MARIA@contabilizape.com.br ', 'senha-forte')).toBe('ok')
     expect(auth.currentUser).not.toHaveProperty('passwordHash')
+  })
+
+  it('blocks inactive accounts and ends their session', async () => {
+    const auth = useAuthStore()
+    await auth.register(maria)
+    expect(auth.refreshSession()).toBe(true)
+
+    const users = readStoredUsers().map((u) => ({ ...u, active: false }))
+    writeStoredUsers(users)
+
+    expect(auth.refreshSession()).toBe(false)
+    expect(auth.isAuthenticated).toBe(false)
+    expect(await auth.login('maria@contabilizape.com.br', 'senha-forte')).toBe('inactive')
   })
 })

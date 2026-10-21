@@ -1,15 +1,43 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import HomeView from '../views/HomeView.vue'
+import AppLayout from '../components/AppLayout.vue'
+import MyTicketsView from '../views/MyTicketsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      component: AppLayout,
       meta: { requiresAuth: true },
+      children: [
+        { path: '', redirect: { name: 'tickets' } },
+        { path: 'chamados', name: 'tickets', component: MyTicketsView },
+        {
+          path: 'chamados/meus',
+          name: 'my-tickets',
+          component: MyTicketsView,
+          props: { mine: true },
+          meta: { analystOnly: true },
+        },
+        {
+          path: 'chamados/novo',
+          name: 'new-ticket',
+          component: () => import('../views/NewTicketView.vue'),
+        },
+        {
+          path: 'chamados/:id(\\d+)',
+          name: 'ticket',
+          component: () => import('../views/TicketDetailView.vue'),
+        },
+        { path: 'perfil', name: 'profile', component: () => import('../views/ProfileView.vue') },
+        {
+          path: 'usuarios',
+          name: 'users',
+          component: () => import('../views/UsersView.vue'),
+          meta: { analystOnly: true },
+        },
+      ],
     },
     {
       path: '/login',
@@ -29,11 +57,17 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  // A cada troca de tela, confere se a conta ainda está ativa (pode ter sido desativada).
+  auth.refreshSession()
+
+  if (to.matched.some((r) => r.meta.requiresAuth) && !auth.isAuthenticated) {
     return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
   }
   if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'home' }
+    return { name: 'tickets' }
+  }
+  if (to.meta.analystOnly && !auth.isAnalyst) {
+    return { name: 'tickets' }
   }
 })
 

@@ -4,11 +4,17 @@ import { computed, ref, useId } from 'vue'
 const props = withDefaults(
   defineProps<{
     label: string
-    type?: 'text' | 'email' | 'password' | 'select'
+    type?: 'text' | 'email' | 'password' | 'select' | 'textarea'
     placeholder?: string
     autocomplete?: string
     inputmode?: 'text' | 'numeric' | 'email'
     maxlength?: number
+    /** Mostra "38 / 120" ao lado do rótulo (requer `maxlength`). */
+    showCount?: boolean
+    disabled?: boolean
+    /** Cor da bolinha exibida antes do valor (ex.: categoria do chamado). */
+    dot?: string
+    rows?: number
     /** Opções da lista quando `type` é 'select'. */
     options?: readonly string[]
     error?: string
@@ -19,6 +25,10 @@ const props = withDefaults(
     autocomplete: undefined,
     inputmode: undefined,
     maxlength: undefined,
+    showCount: false,
+    disabled: false,
+    dot: undefined,
+    rows: 6,
     options: () => [],
     error: '',
   },
@@ -35,22 +45,43 @@ const inputType = computed(() =>
 </script>
 
 <template>
-  <div class="field" :class="{ 'field--error': error }">
-    <label :for="id" class="field__label">{{ label }}</label>
-    <div class="field__control">
+  <div
+    class="field"
+    :class="{ 'field--error': error, 'field--disabled': disabled, 'field--dot': dot }"
+  >
+    <div class="field__label-row">
+      <label :for="id" class="field__label">{{ label }}</label>
+      <span v-if="showCount && maxlength" class="field__count" aria-hidden="true">
+        {{ model.length }} / {{ maxlength }}
+      </span>
+    </div>
+    <div class="field__control" :style="dot ? { '--dot': dot } : undefined">
       <select
         v-if="type === 'select'"
         :id="id"
         v-model="model"
         class="field__input field__select"
         :class="{ 'field__select--empty': !model }"
+        :disabled="disabled"
         :autocomplete="autocomplete"
         :aria-invalid="error ? 'true' : undefined"
-        :aria-describedby="error ? messageId : undefined"
+        :aria-describedby="error || $slots.hint ? messageId : undefined"
       >
         <option value="" disabled>{{ placeholder ?? 'Selecione' }}</option>
         <option v-for="option in options" :key="option" :value="option">{{ option }}</option>
       </select>
+      <textarea
+        v-else-if="type === 'textarea'"
+        :id="id"
+        v-model="model"
+        class="field__input field__textarea"
+        :rows="rows"
+        :placeholder="placeholder"
+        :maxlength="maxlength"
+        :disabled="disabled"
+        :aria-invalid="error ? 'true' : undefined"
+        :aria-describedby="error || $slots.hint ? messageId : undefined"
+      />
       <input
         v-else
         :id="id"
@@ -61,6 +92,7 @@ const inputType = computed(() =>
         :autocomplete="autocomplete"
         :inputmode="inputmode"
         :maxlength="maxlength"
+        :disabled="disabled"
         :aria-invalid="error ? 'true' : undefined"
         :aria-describedby="error || $slots.hint ? messageId : undefined"
       />
@@ -98,12 +130,62 @@ const inputType = computed(() =>
 </template>
 
 <style scoped>
-.field__label {
-  display: block;
+.field__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
+}
+
+.field__label {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.field__count {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.field__textarea {
+  height: auto;
+  min-height: 120px;
+  padding: 12px 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.field__input:disabled {
+  border-color: #e3e7ef;
+  background-color: #f1f3f7;
+  color: var(--text-soft);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.field--disabled .field__label {
+  color: var(--text-muted);
+}
+
+/* Bolinha colorida antes do valor selecionado */
+.field--dot .field__control::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.field--dot .field__input {
+  padding-left: 36px;
 }
 
 .field__control {

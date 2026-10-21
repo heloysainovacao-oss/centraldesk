@@ -21,14 +21,21 @@ async function handleSubmit() {
   if (errors.email || errors.password) return
 
   submitting.value = true
-  const ok = await auth.login(form.email, form.password)
+  const result = await auth.login(form.email, form.password)
   submitting.value = false
 
-  if (!ok) {
+  if (result === 'invalid') {
     errors.password = 'E-mail ou senha incorretos.'
     return
   }
+  if (result === 'inactive') {
+    errors.password = 'Sua conta está desativada. Fale com a equipe de Inovação.'
+    return
+  }
+  goToApp()
+}
 
+function goToApp() {
   const redirect = route.query.redirect
   router.push(typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/')
 }
