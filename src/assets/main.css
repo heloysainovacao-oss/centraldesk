@@ -137,9 +137,17 @@ dialog {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Tabelas ignoram a altura de 1px; como bloco, ficam realmente escondidas. */
+table.sr-only {
+  display: block;
 }
 
 .card {

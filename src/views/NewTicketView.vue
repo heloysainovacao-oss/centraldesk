@@ -125,8 +125,8 @@ async function handleSubmit() {
             />
           </div>
           <p class="ticket-form__note">
-            Escolha o setor responsável pelo assunto: Contábil, Fiscal, Departamento Pessoal,
-            Inovação (sistemas e equipamentos)…
+            Escolha o setor responsável pelo assunto: Inovação (sistemas e equipamentos),
+            Departamento Pessoal, Contabilidade, Fiscal, BPO Financeiro…
           </p>
         </div>
 

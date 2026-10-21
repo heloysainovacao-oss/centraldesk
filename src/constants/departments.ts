@@ -1,13 +1,16 @@
-// Setores/departamentos da empresa. Usados no cadastro (departamento da pessoa)
-// e na abertura de chamados (setor de destino). Para incluir um setor novo, adicione aqui.
+// Departamentos da empresa. Usados no cadastro (departamento da pessoa), na abertura
+// de chamados (setor de destino) e nos filtros. Para incluir um novo, adicione aqui.
 export const DEPARTMENTS = [
-  'Administrativo',
-  'Comercial',
-  'Contábil',
-  'Departamento Pessoal',
-  'Financeiro',
-  'Fiscal',
   'Inovação',
+  'Departamento Pessoal',
+  'Marketing',
+  'Comercial',
+  'Contabilidade',
+  'Fiscal',
+  'Legalização',
+  'Processos',
+  'BPO Financeiro',
+  'Diretoria',
 ] as const
 
 export type Department = (typeof DEPARTMENTS)[number]

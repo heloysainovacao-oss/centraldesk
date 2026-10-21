@@ -38,6 +38,12 @@ const router = createRouter({
           meta: { analystOnly: true },
         },
         {
+          path: 'metricas/dashboard',
+          name: 'dashboard',
+          component: () => import('../views/DashboardView.vue'),
+          meta: { analystOnly: true },
+        },
+        {
           path: 'categorias',
           name: 'categories',
           component: () => import('../views/CategoriesView.vue'),

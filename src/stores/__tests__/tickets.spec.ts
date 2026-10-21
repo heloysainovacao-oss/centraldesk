@@ -15,7 +15,7 @@ const maria: User = {
   name: 'Maria Silva',
   email: 'maria@contabilizape.com.br',
   cpf: '52998224725',
-  department: 'Financeiro',
+  department: 'BPO Financeiro',
   role: 'usuario',
   active: true,
 }
@@ -27,6 +27,11 @@ const ana: User = {
   department: 'Inovação',
   role: 'admin',
   active: true,
+}
+
+const done = {
+  summary: 'Notebook reiniciado em modo seguro.',
+  details: 'Desfiz a atualização pelo modo de recuperação e testei com o solicitante.',
 }
 
 const rafael: User = { ...ana, name: 'Rafael Lima', email: 'rafael@contabilizape.com.br' }
@@ -105,7 +110,7 @@ describe('ticket chat', () => {
       assigneeName: 'Ana Suporte',
     })
 
-    store.resolve(ticket.id, ana)
+    store.resolve(ticket.id, ana, done)
     expect(store.ticketById(ticket.id)?.status).toBe('resolvido')
     expect(store.sendMessage(ticket.id, maria, 'Voltou a dar problema')).toBeNull()
 
@@ -117,6 +122,24 @@ describe('ticket chat', () => {
     expect(store.messageCount(ticket.id)).toBe(0)
     expect(store.ticketById(ticket.id)?.assignedAt).toBeTruthy()
     expect(store.ticketById(ticket.id)?.resolvedAt).toBeTruthy()
+  })
+
+  it('only closes a ticket with a summary and details of what was done', () => {
+    const store = useTicketsStore()
+    const ticket = store.create(draft, maria)
+    store.assign(ticket.id, ana)
+
+    expect(store.resolve(ticket.id, ana, { summary: '', details: done.details })).toBe(false)
+    expect(store.resolve(ticket.id, ana, { summary: done.summary, details: '   ' })).toBe(false)
+    expect(store.resolve(ticket.id, ana, { summary: 'curto', details: done.details })).toBe(false)
+    expect(store.ticketById(ticket.id)?.status).toBe('em-andamento')
+
+    expect(store.resolve(ticket.id, ana, done)).toBe(true)
+    expect(store.ticketById(ticket.id)).toMatchObject({
+      status: 'resolvido',
+      resolutionSummary: done.summary,
+      resolutionDetails: done.details,
+    })
   })
 
   it('reassigns a ticket to another analyst and logs it in the chat', () => {
@@ -158,7 +181,7 @@ describe('ticket rating', () => {
     const store = useTicketsStore()
     const ticket = store.create(draft, maria)
     store.assign(ticket.id, ana)
-    store.resolve(ticket.id, ana)
+    store.resolve(ticket.id, ana, done)
     return { store, id: ticket.id }
   }
 

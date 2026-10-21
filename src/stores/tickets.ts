@@ -26,6 +26,10 @@ export interface Ticket {
   assignedAt?: string
   /** Quando foi encerrado. */
   resolvedAt?: string
+  /** Encerramento: resumo do que foi feito (obrigatório para encerrar). */
+  resolutionSummary?: string
+  /** Encerramento: detalhes do que foi feito até a conclusão (obrigatório para encerrar). */
+  resolutionDetails?: string
   /** Avaliação do atendimento pelo solicitante, de 1 a 5 estrelas. */
   rating?: number
   ratingComment?: string
@@ -51,6 +55,21 @@ export interface TicketMessage {
   body: string
   createdAt: string
 }
+
+/** O que foi feito no atendimento, informado ao encerrar. */
+export interface TicketResolution {
+  /** Resumo do que foi feito. */
+  summary: string
+  /** Detalhes do que foi feito até a conclusão. */
+  details: string
+}
+
+export const RESOLUTION_LIMITS = {
+  summaryMin: 10,
+  summaryMax: 200,
+  detailsMin: 20,
+  detailsMax: 2000,
+} as const
 
 export const TICKETS_KEY = 'centraldesk:tickets'
 export const MESSAGES_KEY = 'centraldesk:messages'
@@ -200,10 +219,25 @@ export const useTicketsStore = defineStore('tickets', () => {
     pushMessage(ticketId, by, text, 'evento')
   }
 
-  /** O analista encerra o chamado e a conversa é fechada. */
-  function resolve(ticketId: number, analyst: User) {
-    updateTicket(ticketId, { status: 'resolvido', resolvedAt: new Date().toISOString() })
+  /**
+   * O analista encerra o chamado. O resumo e o comentário do que foi feito são
+   * obrigatórios; sem eles o chamado não é encerrado (retorna `false`).
+   */
+  function resolve(ticketId: number, analyst: User, resolution: TicketResolution): boolean {
+    const summary = resolution.summary.trim()
+    const details = resolution.details.trim()
+    const ticket = ticketById(ticketId)
+    if (!ticket || ticket.status === 'resolvido') return false
+    if (summary.length < RESOLUTION_LIMITS.summaryMin) return false
+    if (details.length < RESOLUTION_LIMITS.detailsMin) return false
+    updateTicket(ticketId, {
+      status: 'resolvido',
+      resolvedAt: new Date().toISOString(),
+      resolutionSummary: summary.slice(0, RESOLUTION_LIMITS.summaryMax),
+      resolutionDetails: details.slice(0, RESOLUTION_LIMITS.detailsMax),
+    })
     pushMessage(ticketId, analyst, `Chamado encerrado por ${analyst.name}`, 'evento')
+    return true
   }
 
   /**

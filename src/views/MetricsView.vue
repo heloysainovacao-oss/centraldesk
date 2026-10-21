@@ -173,18 +173,29 @@ function waitingFor(iso: string) {
       <h1 class="page-title">Painel de métricas</h1>
       <p class="page-subtitle">Últimos {{ days }} dias · comparado ao período anterior</p>
     </div>
-    <div class="periods" role="group" aria-label="Período">
-      <button
-        v-for="p in PERIODS"
-        :key="p"
-        type="button"
-        class="periods__item"
-        :class="{ 'periods__item--active': days === p }"
-        :aria-pressed="days === p"
-        @click="days = p"
-      >
-        {{ p }} dias
-      </button>
+    <div class="header__actions">
+      <div class="periods" role="group" aria-label="Período">
+        <button
+          v-for="p in PERIODS"
+          :key="p"
+          type="button"
+          class="periods__item"
+          :class="{ 'periods__item--active': days === p }"
+          :aria-pressed="days === p"
+          @click="days = p"
+        >
+          {{ p }} dias
+        </button>
+      </div>
+      <RouterLink :to="{ name: 'dashboard' }" class="btn btn--primary">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="9" rx="1.5" />
+          <rect x="14" y="3" width="7" height="5" rx="1.5" />
+          <rect x="14" y="12" width="7" height="9" rx="1.5" />
+          <rect x="3" y="16" width="7" height="5" rx="1.5" />
+        </svg>
+        Gerar dashboard
+      </RouterLink>
     </div>
   </header>
 
@@ -370,6 +381,21 @@ function waitingFor(iso: string) {
   gap: 16px;
   max-width: 1140px;
   margin-bottom: 24px;
+}
+
+.header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.header__actions .btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
 }
 
 .periods {

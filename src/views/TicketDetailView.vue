@@ -4,12 +4,13 @@ import { RouterLink, useRoute } from 'vue-router'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import RatingCard from '@/components/RatingCard.vue'
+import ResolveDialog from '@/components/ResolveDialog.vue'
 import TicketChat from '@/components/TicketChat.vue'
 import TicketTimeline from '@/components/TicketTimeline.vue'
 import { priorityById } from '@/constants/tickets'
 import { useCategoriesStore } from '@/stores/categories'
 import { useAuthStore } from '@/stores/auth'
-import { formatTicketNumber, useTicketsStore } from '@/stores/tickets'
+import { formatTicketNumber, useTicketsStore, type TicketResolution } from '@/stores/tickets'
 import { useUsersStore } from '@/stores/users'
 import { formatDateTime, formatDuration } from '@/utils/format'
 import { initials } from '@/utils/user'
@@ -103,9 +104,9 @@ function confirmAssign() {
 
 const resolveOpen = ref(false)
 
-function confirmResolve() {
-  if (ticket.value && auth.currentUser) tickets.resolve(ticket.value.id, auth.currentUser)
-  resolveOpen.value = false
+function confirmResolve(resolution: TicketResolution) {
+  if (!ticket.value || !auth.currentUser) return
+  if (tickets.resolve(ticket.value.id, auth.currentUser, resolution)) resolveOpen.value = false
 }
 </script>
 
@@ -195,6 +196,23 @@ function confirmResolve() {
           <p class="description">{{ ticket.description }}</p>
         </section>
 
+        <section
+          v-if="ticket.status === 'resolvido' && ticket.resolutionSummary"
+          class="card block resolution"
+          aria-labelledby="resolution-title"
+        >
+          <h2 id="resolution-title" class="block__label">Resolução</h2>
+          <p class="resolution__summary">{{ ticket.resolutionSummary }}</p>
+          <p class="resolution__details">{{ ticket.resolutionDetails }}</p>
+          <p class="resolution__meta">
+            Encerrado
+            <template v-if="ticket.assigneeName"> por {{ ticket.assigneeName }}</template>
+            <template v-if="ticket.resolvedAt">
+              em {{ formatDateTime(ticket.resolvedAt) }}</template
+            >
+          </p>
+        </section>
+
         <RatingCard v-if="ticket.status === 'resolvido'" :ticket="ticket" />
 
         <TicketChat :ticket="ticket" />
@@ -248,16 +266,12 @@ function confirmResolve() {
       <p v-else>Não há outro administrador ativo para receber este chamado.</p>
     </ConfirmDialog>
 
-    <ConfirmDialog
+    <ResolveDialog
       :open="resolveOpen"
-      title="Encerrar chamado?"
-      confirm-label="Encerrar chamado"
+      :ticket-number="formatTicketNumber(ticket.id)"
       @confirm="confirmResolve"
       @close="resolveOpen = false"
-    >
-      O chamado {{ formatTicketNumber(ticket.id) }} será marcado como encerrado e a conversa será
-      finalizada.
-    </ConfirmDialog>
+    />
   </div>
 </template>
 
@@ -417,6 +431,34 @@ function confirmResolve() {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.resolution {
+  border-color: #cdebd8;
+  background: linear-gradient(180deg, #f3fbf6 0%, #fff 70%);
+}
+
+.resolution__summary {
+  color: var(--navy-800);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.resolution__details {
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.resolution__meta {
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
 }
 
 .description {
