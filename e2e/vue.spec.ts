@@ -23,7 +23,7 @@ test('creates an account, logs out and logs back in', async ({ page }) => {
   await page.getByLabel('E-mail corporativo').fill('maria@contabilizape.com.br')
   await page.getByRole('button', { name: 'Criar conta' }).click()
   // A primeira conta de um sistema sem administrador vira administradora.
-  await expect(page.getByRole('heading', { name: 'Fila de atendimento' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Atendimentos' })).toBeVisible()
 
   await page.goto('/chamados/novo')
   await expect(page.getByLabel('Setor de destino')).toBeEnabled()
@@ -57,5 +57,5 @@ test('creates an account, logs out and logs back in', async ({ page }) => {
 
   await page.getByLabel('Senha', { exact: true }).fill('SenhaForte1')
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await expect(page.getByRole('heading', { name: 'Fila de atendimento' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Atendimentos' })).toBeVisible()
 })

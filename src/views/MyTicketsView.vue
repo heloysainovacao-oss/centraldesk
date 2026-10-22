@@ -5,7 +5,8 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import { SECTORS, STATUSES, priorityById, type TicketStatus } from '@/constants/tickets'
 import { useAuthStore } from '@/stores/auth'
 import { useCategoriesStore } from '@/stores/categories'
-import { formatTicketNumber, useTicketsStore } from '@/stores/tickets'
+import { formatTicketNumber, useTicketsStore, type Ticket } from '@/stores/tickets'
+import { initials } from '@/utils/user'
 
 // `mine`: lista só os chamados abertos pela própria pessoa ("Chamados que abri" do analista).
 const props = defineProps<{ mine?: boolean }>()
@@ -23,10 +24,10 @@ const list = computed(() => {
 })
 
 const heading = computed(() =>
-  isQueue.value ? 'Fila de atendimento' : auth.isAnalyst ? 'Chamados que abri' : 'Meus chamados',
+  isQueue.value ? 'Atendimentos' : auth.isAnalyst ? 'Chamados que abri' : 'Meus chamados',
 )
 
-// Filtro por setor de destino (na fila de atendimento).
+// Filtro por setor de destino (em Atendimentos).
 const sectorFilter = ref('')
 const sectorOptions = computed(() =>
   SECTORS.map((s) => s.name).filter((name) => list.value.some((t) => t.sector === name)),
@@ -59,6 +60,22 @@ const dateFormat = new Intl.DateTimeFormat('pt-BR', {
 
 function formatDate(iso: string) {
   return dateFormat.format(new Date(iso))
+}
+
+// --- Assumir direto pela lista (Atendimentos) ---
+const feedback = ref('')
+let feedbackTimer: ReturnType<typeof setTimeout> | undefined
+
+function assume(ticket: Ticket) {
+  if (!auth.currentUser) return
+  tickets.assign(ticket.id, auth.currentUser)
+  feedback.value = `Você assumiu o chamado ${formatTicketNumber(ticket.id)}. Ele passou para "Em andamento".`
+  clearTimeout(feedbackTimer)
+  feedbackTimer = setTimeout(() => (feedback.value = ''), 5000)
+}
+
+function isMe(email?: string) {
+  return !!email && email === auth.currentUser?.email
 }
 </script>
 
@@ -102,6 +119,8 @@ function formatDate(iso: string) {
     </label>
   </div>
 
+  <p v-if="feedback" class="feedback" role="status">{{ feedback }}</p>
+
   <section v-if="list.length" class="card list" aria-label="Lista de chamados">
     <div class="list__head" :class="{ 'list__head--analyst': isQueue }" aria-hidden="true">
       <span>Chamado</span>
@@ -109,15 +128,13 @@ function formatDate(iso: string) {
       <span>Categoria</span>
       <span>Prioridade</span>
       <span>Status</span>
+      <span v-if="isQueue">Responsável</span>
       <span>Aberto em</span>
     </div>
     <ul>
       <li v-for="ticket in visible" :key="ticket.id">
-        <RouterLink
-          :to="{ name: 'ticket', params: { id: ticket.id } }"
-          class="row"
-          :class="{ 'row--analyst': isQueue }"
-        >
+        <!-- A linha inteira abre o chamado (link "esticado" no título); o botão Assumir fica por cima. -->
+        <div class="row" :class="{ 'row--analyst': isQueue }">
           <span class="row__title">
             <span class="row__number">
               {{ formatTicketNumber(ticket.id) }}
@@ -130,7 +147,9 @@ function formatDate(iso: string) {
                 <span class="sr-only">mensagens</span>
               </span>
             </span>
-            <strong>{{ ticket.title }}</strong>
+            <RouterLink :to="{ name: 'ticket', params: { id: ticket.id } }" class="row__link">
+              <strong>{{ ticket.title }}</strong>
+            </RouterLink>
           </span>
           <span v-if="isQueue" class="row__author">
             {{ ticket.authorName ?? ticket.authorEmail }}
@@ -161,8 +180,27 @@ function formatDate(iso: string) {
               ★ {{ ticket.rating }}
             </span>
           </span>
+          <span v-if="isQueue" class="row__assignee">
+            <template v-if="ticket.assigneeName">
+              <span class="avatar" aria-hidden="true">{{ initials(ticket.assigneeName) }}</span>
+              <span class="row__assignee-name">
+                {{ ticket.assigneeName }}
+                <small v-if="isMe(ticket.assigneeEmail)">você</small>
+              </span>
+            </template>
+            <button
+              v-else-if="ticket.status !== 'resolvido'"
+              type="button"
+              class="btn btn--primary btn--assume"
+              :aria-label="`Assumir o chamado ${formatTicketNumber(ticket.id)}`"
+              @click="assume(ticket)"
+            >
+              Assumir
+            </button>
+            <span v-else class="row__none">—</span>
+          </span>
           <span class="row__date">{{ formatDate(ticket.createdAt) }}</span>
-        </RouterLink>
+        </div>
       </li>
     </ul>
     <p v-if="!visible.length" class="list__empty">Nenhum chamado com esses filtros.</p>
@@ -170,7 +208,7 @@ function formatDate(iso: string) {
 
   <section v-else class="card empty">
     <template v-if="isQueue">
-      <h2>A fila está vazia</h2>
+      <h2>Nenhum atendimento por aqui</h2>
       <p>Quando alguém abrir um chamado para qualquer setor, ele aparece aqui.</p>
     </template>
     <template v-else>
@@ -314,7 +352,96 @@ function formatDate(iso: string) {
 
 .list__head--analyst,
 .row--analyst {
-  grid-template-columns: minmax(0, 2.2fr) 1.3fr 1.2fr 0.9fr 1.1fr 1fr;
+  grid-template-columns:
+    minmax(0, 2.1fr) minmax(0, 1.2fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1fr)
+    minmax(0, 1.3fr) minmax(0, 0.9fr);
+}
+
+.row {
+  position: relative;
+}
+
+/* O título "estica" o link sobre a linha toda; o botão Assumir fica acima dele. */
+.row__link {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.row__link:focus-visible {
+  outline: none;
+}
+
+.row:has(.row__link:focus-visible) {
+  outline: 2px solid var(--navy-700);
+  outline-offset: -2px;
+}
+
+.row__assignee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.row__assignee .avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--orange-500);
+  color: var(--navy-900);
+  font-size: 0.6875rem;
+  font-weight: 800;
+}
+
+.row__assignee-name {
+  display: grid;
+  min-width: 0;
+  color: var(--navy-800);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.row__assignee-name small {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.btn--assume {
+  position: relative;
+  z-index: 1;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 0.8125rem;
+}
+
+.row__none {
+  color: var(--text-soft);
+}
+
+.feedback {
+  max-width: 1140px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid #bfe3cd;
+  border-radius: 10px;
+  background: #ecf8f1;
+  color: #17643a;
+  font-size: 0.875rem;
 }
 
 .list__head {
@@ -457,7 +584,8 @@ function formatDate(iso: string) {
   }
 
   .row__title,
-  .row__author {
+  .row__author,
+  .row__assignee {
     grid-column: 1 / -1;
   }
 

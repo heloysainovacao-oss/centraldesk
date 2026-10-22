@@ -259,7 +259,7 @@ function waitingFor(iso: string) {
           {{ Math.round(grow(unassigned)) }} sem responsável
         </span>
         <span v-else class="kpi__ok">Todos com responsável</span>
-        <RouterLink :to="{ name: 'tickets' }" class="kpi__link">Ver fila</RouterLink>
+        <RouterLink :to="{ name: 'tickets' }" class="kpi__link">Ver atendimentos</RouterLink>
       </article>
     </section>
 
@@ -351,7 +351,7 @@ function waitingFor(iso: string) {
     <section class="card panel">
       <header class="panel__head">
         <h2>Mais antigos sem responsável</h2>
-        <RouterLink :to="{ name: 'tickets' }" class="panel__link">Abrir fila</RouterLink>
+        <RouterLink :to="{ name: 'tickets' }" class="panel__link">Abrir atendimentos</RouterLink>
       </header>
       <ul v-if="waiting.length" class="waiting">
         <li v-for="t in waiting" :key="t.id">

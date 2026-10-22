@@ -215,3 +215,9 @@ table.sr-only {
 .btn--secondary:hover {
   background: #f0f2f7;
 }
+
+/* Enquanto a pessoa arrasta a borda do menu */
+body.is-resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
+}

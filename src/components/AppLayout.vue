@@ -2,6 +2,12 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import BrandLogo from './BrandLogo.vue'
+import {
+  SIDEBAR_COLLAPSED,
+  SIDEBAR_MAX,
+  SIDEBAR_MIN,
+  useSidebarSize,
+} from '@/composables/useSidebarSize'
 import { ROLE_LABELS, useAuthStore } from '@/stores/auth'
 import { initials } from '@/utils/user'
 
@@ -13,6 +19,13 @@ function handleLogout() {
   router.push({ name: 'login' })
 }
 
+// Largura ajustável e menu recolhível (só ícones).
+const { width, collapsed, resizing, startResize, onKeydown, resetWidth, toggleCollapsed } =
+  useSidebarSize()
+const sidebarWidth = computed(() => `${collapsed.value ? SIDEBAR_COLLAPSED : width.value}px`)
+/** Com o menu recolhido, o nome do item aparece ao passar o mouse. */
+const tip = (label: string) => (collapsed.value ? label : undefined)
+
 const userInitials = computed(() => initials(auth.currentUser?.name ?? ''))
 
 const subtitle = computed(() =>
@@ -23,15 +36,53 @@ const subtitle = computed(() =>
 </script>
 
 <template>
-  <div class="app">
+  <div
+    class="app"
+    :class="{ 'app--collapsed': collapsed, 'app--resizing': resizing }"
+    :style="{ '--sidebar-w': sidebarWidth }"
+  >
     <aside class="sidebar">
+      <button
+        type="button"
+        class="sidebar__toggle"
+        :title="collapsed ? 'Expandir menu' : 'Recolher menu'"
+        :aria-expanded="!collapsed"
+        @click="toggleCollapsed"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path :d="collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'" />
+        </svg>
+        <span class="sr-only">{{ collapsed ? 'Expandir menu' : 'Recolher menu' }}</span>
+      </button>
+
+      <!-- Borda arrastável: muda a largura do menu -->
+      <div
+        v-if="!collapsed"
+        class="sidebar__resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Largura do menu (use as setas; Enter volta ao padrão)"
+        :aria-valuenow="width"
+        :aria-valuemin="SIDEBAR_MIN"
+        :aria-valuemax="SIDEBAR_MAX"
+        tabindex="0"
+        title="Arraste para ajustar a largura · duplo clique volta ao padrão"
+        @pointerdown="startResize"
+        @keydown="onKeydown"
+        @dblclick="resetWidth"
+      />
       <RouterLink :to="{ name: 'tickets' }" class="sidebar__brand" aria-label="Início">
         <BrandLogo compact />
       </RouterLink>
 
-      <RouterLink v-if="!auth.isAnalyst" :to="{ name: 'new-ticket' }" class="sidebar__cta">
+      <RouterLink
+        v-if="!auth.isAnalyst"
+        :to="{ name: 'new-ticket' }"
+        class="sidebar__cta"
+        :title="tip('Novo chamado')"
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-        Novo chamado
+        <span class="sidebar__label">Novo chamado</span>
       </RouterLink>
 
       <!-- Analista: menu em seções, com a área de administração -->
@@ -40,37 +91,41 @@ const subtitle = computed(() =>
         <RouterLink
           :to="{ name: 'tickets' }"
           class="sidebar__link"
+          :title="tip('Atendimentos')"
           exact-active-class="sidebar__link--active"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
-          Fila de atendimento
+          <span class="sidebar__label">Atendimentos</span>
         </RouterLink>
         <RouterLink
           :to="{ name: 'my-tickets' }"
           class="sidebar__link"
+          :title="tip('Chamados que abri')"
           exact-active-class="sidebar__link--active"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" />
           </svg>
-          Chamados que abri
+          <span class="sidebar__label">Chamados que abri</span>
         </RouterLink>
 
         <p class="sidebar__section">Administração</p>
         <RouterLink
           :to="{ name: 'metrics' }"
           class="sidebar__link"
+          :title="tip('Painel de métricas')"
           active-class="sidebar__link--active"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 20h16M7 20v-6M12 20V8M17 20v-9" />
           </svg>
-          Painel de métricas
+          <span class="sidebar__label">Painel de métricas</span>
         </RouterLink>
         <RouterLink
           v-if="auth.isAdmin"
           :to="{ name: 'users' }"
           class="sidebar__link"
+          :title="tip('Usuários')"
           active-class="sidebar__link--active"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -79,19 +134,20 @@ const subtitle = computed(() =>
               d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"
             />
           </svg>
-          Usuários
+          <span class="sidebar__label">Usuários</span>
         </RouterLink>
         <RouterLink
           v-if="auth.isAdmin"
           :to="{ name: 'categories' }"
           class="sidebar__link"
+          :title="tip('Categorias')"
           active-class="sidebar__link--active"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />
             <circle cx="8" cy="8" r="1.5" />
           </svg>
-          Categorias
+          <span class="sidebar__label">Categorias</span>
         </RouterLink>
       </nav>
 
@@ -100,23 +156,25 @@ const subtitle = computed(() =>
         <RouterLink
           :to="{ name: 'tickets' }"
           class="sidebar__link"
+          :title="tip('Meus chamados')"
           exact-active-class="sidebar__link--active"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" />
           </svg>
-          Meus chamados
+          <span class="sidebar__label">Meus chamados</span>
         </RouterLink>
         <RouterLink
           :to="{ name: 'profile' }"
           class="sidebar__link"
+          :title="tip('Meu perfil')"
           exact-active-class="sidebar__link--active"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="8" r="4" />
             <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
           </svg>
-          Meu perfil
+          <span class="sidebar__label">Meu perfil</span>
         </RouterLink>
       </nav>
 
@@ -153,20 +211,139 @@ const subtitle = computed(() =>
 <style scoped>
 .app {
   display: grid;
-  grid-template-columns: 256px 1fr;
+  grid-template-columns: var(--sidebar-w, 256px) 1fr;
   min-height: 100vh;
   background: var(--page-bg);
+  transition: grid-template-columns 0.2s ease;
+}
+
+/* Enquanto arrasta, a largura acompanha o mouse sem animação. */
+.app--resizing {
+  transition: none;
 }
 
 .sidebar {
   position: sticky;
   top: 0;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  min-width: 0;
   padding: 24px 16px 24px;
   background: var(--navy-800);
   color: #fff;
+}
+
+/* Botão redondo na borda: recolher / expandir o menu */
+.sidebar__toggle {
+  position: absolute;
+  top: 34px;
+  right: -14px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--navy-800);
+  box-shadow: 0 2px 6px rgba(11, 34, 105, 0.18);
+  cursor: pointer;
+}
+
+.sidebar__toggle:hover {
+  background: #eef1f6;
+}
+
+.sidebar__toggle svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.4;
+}
+
+/* Alça invisível na borda direita; aparece uma linha ao passar o mouse. */
+.sidebar__resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 1;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar__resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.sidebar__resizer:hover::after,
+.sidebar__resizer:focus-visible::after,
+.app--resizing .sidebar__resizer::after {
+  background: var(--blue-500);
+}
+
+.sidebar__resizer:focus-visible {
+  outline: none;
+}
+
+/* ---- Menu recolhido: só ícones ---- */
+.app--collapsed .sidebar {
+  padding-inline: 12px;
+}
+
+.app--collapsed .sidebar__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.app--collapsed .sidebar__brand {
+  align-self: center;
+  margin-left: 0;
+}
+
+.app--collapsed .sidebar :deep(.brand__text) {
+  display: none;
+}
+
+.app--collapsed .sidebar__link,
+.app--collapsed .sidebar__cta {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.app--collapsed .sidebar__section {
+  height: 1px;
+  margin: 14px 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+  color: transparent;
+}
+
+.app--collapsed .sidebar__user {
+  flex-direction: column;
+}
+
+.app--collapsed .sidebar__profile {
+  justify-content: center;
+}
+
+.app--collapsed .sidebar__who {
+  display: none;
 }
 
 .sidebar__brand {
@@ -374,8 +551,21 @@ const subtitle = computed(() =>
 }
 
 @media (max-width: 900px) {
-  .app {
+  /* No celular a barra vira uma faixa no topo: largura e recolhimento não se aplicam. */
+  .app,
+  .app--collapsed {
     grid-template-columns: 1fr;
+  }
+
+  .app--collapsed .sidebar__label {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
+
+  .app--collapsed .sidebar :deep(.brand__text) {
+    display: grid;
   }
 
   .sidebar {
@@ -415,7 +605,9 @@ const subtitle = computed(() =>
     font-size: 0.875rem;
   }
 
-  .sidebar__user {
+  .sidebar__user,
+  .sidebar__toggle,
+  .sidebar__resizer {
     display: none;
   }
 

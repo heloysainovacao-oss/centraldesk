@@ -125,7 +125,7 @@ const ACTIONS: Record<ActionType, ActionInfo> = {
     title: 'Tornar administrador?',
     confirmLabel: 'Tornar administrador',
     text: (n) =>
-      `${n} passará a atender chamados (fila de atendimento, chat, Painel de métricas) e a gerenciar usuários, perfis e contas.`,
+      `${n} passará a atender chamados (Atendimentos, chat, Painel de métricas) e a gerenciar usuários, perfis e contas.`,
     done: (n) => `${n} agora é administrador.`,
   },
   'remove-admin': {

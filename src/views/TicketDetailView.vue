@@ -28,7 +28,7 @@ const ticket = computed(() => {
   return found
 })
 
-const listLabel = computed(() => (auth.isAnalyst ? 'Fila de atendimento' : 'Meus chamados'))
+const listLabel = computed(() => (auth.isAnalyst ? 'Atendimentos' : 'Meus chamados'))
 const justCreated = computed(() => route.query.novo !== undefined)
 const priority = computed(() => ticket.value && priorityById(ticket.value.priority))
 const canManage = computed(() => auth.isAnalyst && ticket.value?.status !== 'resolvido')
