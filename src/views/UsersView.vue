@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { ROLE_LABELS, isStaffRole, useAuthStore, type User, type UserRole } from '@/stores/auth'
+import {
+  ROLE_LABELS,
+  isCoordinatorRole,
+  isStaffRole,
+  useAuthStore,
+  type User,
+  type UserRole,
+} from '@/stores/auth'
 import { useTicketsStore } from '@/stores/tickets'
 import { ACTION_ERRORS, ANONYMOUS_NAME, useUsersStore, type UserActionResult } from '@/stores/users'
 import { formatCpf } from '@/utils/cpf'
@@ -110,7 +117,14 @@ onBeforeUnmount(() => {
 // ---------- Ações ----------
 
 type ActionType =
-  'make-admin' | 'remove-admin' | 'deactivate' | 'reactivate' | 'anonymize' | 'delete'
+  | 'make-admin'
+  | 'remove-admin'
+  | 'make-coordinator'
+  | 'remove-coordinator'
+  | 'deactivate'
+  | 'reactivate'
+  | 'anonymize'
+  | 'delete'
 
 interface ActionInfo {
   title: string
@@ -134,6 +148,20 @@ const ACTIONS: Record<ActionType, ActionInfo> = {
     text: (n) =>
       `${n} voltará a ser usuário: deixará de atender chamados e de gerenciar usuários. Os chamados em que é responsável continuam com o nome dele até serem reatribuídos.`,
     done: (n) => `${n} agora é usuário.`,
+  },
+  'make-coordinator': {
+    title: 'Tornar coordenador do setor?',
+    confirmLabel: 'Tornar coordenador',
+    text: (n) =>
+      `${n} passará a acompanhar todos os chamados que o próprio setor abrir ou receber, e será avisado sempre que alguém do setor abrir um chamado. Não passa a atender chamados.`,
+    done: (n) => `${n} agora coordena o setor.`,
+  },
+  'remove-coordinator': {
+    title: 'Remover coordenação?',
+    confirmLabel: 'Remover coordenação',
+    text: (n) =>
+      `${n} voltará ao perfil Usuário: verá só os próprios chamados e deixará de receber os avisos do setor.`,
+    done: (n) => `${n} voltou ao perfil Usuário.`,
   },
   deactivate: {
     title: 'Desativar conta?',
@@ -197,7 +225,11 @@ function confirmPending() {
       result = usersStore.setRole(email, 'admin', me)
       break
     case 'remove-admin':
+    case 'remove-coordinator':
       result = usersStore.setRole(email, 'usuario', me)
+      break
+    case 'make-coordinator':
+      result = usersStore.setRole(email, 'coordenador', me)
       break
     case 'deactivate':
       result = usersStore.setActive(email, false, me)
@@ -248,6 +280,17 @@ const detailRows = computed(() => {
     { label: 'CPF', value: user.cpf ? formatCpf(user.cpf) : '—' },
     { label: 'Departamento', value: user.department || '—' },
     { label: 'Perfil', value: ROLE_LABELS[user.role] },
+    ...(isCoordinatorRole(user.role)
+      ? [{ label: 'Coordena o setor', value: user.department || '—' }]
+      : []),
+    ...(user.roleChangedAt
+      ? [
+          {
+            label: 'Perfil definido por',
+            value: `${user.roleChangedByName ?? 'administrador'} em ${formatDate(user.roleChangedAt)}`,
+          },
+        ]
+      : []),
     { label: 'Cadastro', value: user.createdAt ? formatDate(user.createdAt) : '—' },
     { label: 'Chamados abertos', value: String(tickets.ticketsBy(user.email).length) },
   ]
@@ -407,6 +450,29 @@ const detailRows = computed(() => {
                   <path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6zM9 12h6" />
                 </svg>
                 Remover administrador
+              </button>
+
+              <button
+                v-if="user.role === 'usuario'"
+                type="button"
+                role="menuitem"
+                @click="ask('make-coordinator', user)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6" />
+                </svg>
+                Tornar coordenador do setor
+              </button>
+              <button
+                v-else-if="user.role === 'coordenador'"
+                type="button"
+                role="menuitem"
+                @click="ask('remove-coordinator', user)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 21h18M5 21V8l7-5 7 5v13M9 13h6" />
+                </svg>
+                Remover coordenação
               </button>
 
               <hr />
@@ -729,6 +795,10 @@ const detailRows = computed(() => {
   background: var(--orange-500);
 }
 
+.avatar--coordenador {
+  background: #e8f0ff;
+}
+
 .avatar--anon {
   background: #eef1f6;
   color: var(--text-muted);
@@ -752,6 +822,11 @@ const detailRows = computed(() => {
 .role--admin {
   background: #e3e8f6;
   color: var(--navy-800);
+}
+
+.role--coordenador {
+  background: #e8f0ff;
+  color: #1c4fa8;
 }
 
 .role--usuario {

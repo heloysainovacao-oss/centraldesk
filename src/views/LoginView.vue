@@ -42,18 +42,27 @@ function goToApp() {
 
 // Atalho de teste: aparece só em desenvolvimento e só se existir src/dev/seed.ts (fora do Git).
 type DemoAccount = { email: string; password: string }
-type DemoModule = { DEMO_USER: DemoAccount; DEMO_ADMIN: DemoAccount }
+type DemoModule = {
+  DEMO_USER: DemoAccount
+  DEMO_ADMIN: DemoAccount
+  DEMO_COORDINATOR?: DemoAccount
+}
 // O `if` garante que nada disso vá para o site publicado.
 let demoLoader: (() => Promise<DemoModule>) | undefined
 if (import.meta.env.DEV) {
   demoLoader = import.meta.glob<DemoModule>('../dev/seed.ts')['../dev/seed.ts']
 }
 
-async function loginAsDemo(profile: 'usuario' | 'admin') {
+async function loginAsDemo(profile: 'usuario' | 'coordenador' | 'admin') {
   if (!demoLoader) return
   const accounts = await demoLoader()
-  const demo = profile === 'admin' ? accounts.DEMO_ADMIN : accounts.DEMO_USER
-  if ((await auth.login(demo.email, demo.password)) === 'ok') goToApp()
+  const demo =
+    profile === 'admin'
+      ? accounts.DEMO_ADMIN
+      : profile === 'coordenador'
+        ? accounts.DEMO_COORDINATOR
+        : accounts.DEMO_USER
+  if (demo && (await auth.login(demo.email, demo.password)) === 'ok') goToApp()
 }
 </script>
 
@@ -117,6 +126,9 @@ async function loginAsDemo(profile: 'usuario' | 'admin') {
       <div class="dev-login__buttons">
         <button type="button" class="dev-login__button" @click="loginAsDemo('usuario')">
           Entrar como usuário
+        </button>
+        <button type="button" class="dev-login__button" @click="loginAsDemo('coordenador')">
+          Entrar como coordenação
         </button>
         <button type="button" class="dev-login__button" @click="loginAsDemo('admin')">
           Entrar como administrador

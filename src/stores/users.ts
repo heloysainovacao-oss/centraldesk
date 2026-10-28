@@ -96,12 +96,21 @@ export const useUsersStore = defineStore('users', () => {
     save(current.map((u) => (u.email === email ? { ...u, ...changes } : u)))
   }
 
-  /** Muda o perfil: usuário ou administrador. */
+  /**
+   * Muda o perfil: usuário, coordenação ou administrador. Registra qual administrador fez a
+   * mudança e quando, para a administração saber quem deu cada acesso.
+   */
   function setRole(email: string, role: UserRole, actingEmail: string): UserActionResult {
     const result = check(email, actingEmail)
     if ('error' in result) return result.error
     if (role !== 'admin' && isLastActiveAdmin(result.current, result.target)) return 'last-admin'
-    update(result.current, email, { role })
+    const actor = result.current.find((u) => u.email === actingEmail)
+    update(result.current, email, {
+      role,
+      roleChangedAt: new Date().toISOString(),
+      roleChangedByName: actor?.name ?? actingEmail,
+      roleChangedByEmail: actingEmail,
+    })
     return 'ok'
   }
 

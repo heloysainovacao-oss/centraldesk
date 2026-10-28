@@ -50,6 +50,18 @@ describe('users store', () => {
     expect(store.userByEmail(BRUNO)?.role).toBe('usuario')
   })
 
+  it('promotes a user to coordination and records who did it', () => {
+    const store = useUsersStore()
+    expect(store.setRole(BRUNO, 'coordenador', ANA)).toBe('ok')
+    const bruno = store.userByEmail(BRUNO)
+    expect(bruno?.role).toBe('coordenador')
+    expect(bruno?.roleChangedByName).toBe('Ana')
+    expect(bruno?.roleChangedByEmail).toBe(ANA)
+    expect(bruno?.roleChangedAt).toBeTruthy()
+    // Ninguém promove a si mesmo.
+    expect(store.setRole(ANA, 'coordenador', ANA)).toBe('self')
+  })
+
   it('never leaves the system without an active administrator', () => {
     writeStoredUsers([account('Ana', 'admin'), account('Carla', 'admin')])
     setActivePinia(createPinia())

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { PriorityId, TicketStatus } from '@/constants/tickets'
 import { isStaffRole, type User, type UserRole } from './auth'
+import { useNotificationsStore } from './notifications'
 
 // Chamados e mensagens salvos só no navegador (localStorage), como a autenticação provisória.
 // Deve ser trocado por uma API real junto com o login.
@@ -37,6 +38,16 @@ export interface Ticket {
   /** O solicitante escolheu "Pular avaliação". */
   ratingSkipped?: boolean
   updatedAt?: string
+  /** Coordenadores que abriram o chamado para acompanhar (a primeira vez de cada um). */
+  views?: TicketView[]
+}
+
+/** Registro de que um coordenador visualizou o chamado de alguém do setor. */
+export interface TicketView {
+  email: string
+  name: string
+  department: string
+  viewedAt: string
 }
 
 export type NewTicket = Pick<Ticket, 'title' | 'sector' | 'category' | 'priority' | 'description'>
@@ -143,7 +154,41 @@ export const useTicketsStore = defineStore('tickets', () => {
     }
     tickets.value = [...tickets.value, ticket]
     saveTickets()
+    // Avisa a coordenação do setor de quem abriu o chamado.
+    useNotificationsStore().notifyNewTicket(ticket)
     return ticket
+  }
+
+  /**
+   * Registra que o coordenador abriu o chamado de alguém do setor. Só a primeira visualização
+   * de cada coordenador entra no histórico, para a conversa não encher de avisos.
+   * Retorna `false` se já estava registrado.
+   */
+  function recordView(ticketId: number, viewer: User): boolean {
+    const ticket = ticketById(ticketId)
+    if (!ticket || ticket.views?.some((v) => v.email === viewer.email)) return false
+    const view: TicketView = {
+      email: viewer.email,
+      name: viewer.name,
+      department: viewer.department,
+      viewedAt: new Date().toISOString(),
+    }
+    // Não mexe em `updatedAt`: visualizar não é uma mudança no chamado.
+    tickets.value = tickets.value.map((t) =>
+      t.id === ticketId ? { ...t, views: [...(t.views ?? []), view] } : t,
+    )
+    saveTickets()
+    pushMessage(
+      ticketId,
+      viewer,
+      `Chamado visualizado por ${viewer.name} (coordenação de ${viewer.department})`,
+      'evento',
+    )
+    return true
+  }
+
+  function viewedBy(ticket: Ticket, email: string): boolean {
+    return !!ticket.views?.some((v) => v.email === email)
   }
 
   function pushMessage(
@@ -314,6 +359,8 @@ export const useTicketsStore = defineStore('tickets', () => {
     messagesFor,
     messageCount,
     create,
+    recordView,
+    viewedBy,
     sendMessage,
     assign,
     reassign,

@@ -9,26 +9,37 @@ export const CORPORATE_DOMAIN = 'contabilizape.com.br'
 
 /**
  * - usuario: abre e acompanha os próprios chamados.
+ * - coordenador: um usuário que também acompanha os chamados do próprio setor (o `department`
+ *   da conta): os que o setor abriu e os que o setor recebeu. É avisado quando alguém do setor
+ *   abre um chamado. Não atende chamados.
  * - admin: equipe de suporte. Atende chamados (fila, chat, métricas) e gerencia usuários.
  *
  * Contas antigas com o perfil "analista" são tratadas como administradoras:
  * no sistema, analista e administrador são a mesma coisa.
  */
-export type UserRole = 'usuario' | 'admin'
+export type UserRole = 'usuario' | 'coordenador' | 'admin'
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   usuario: 'Usuário',
+  coordenador: 'Coordenação',
   admin: 'Administrador',
 }
 
 /** Converte perfis de versões anteriores ("analista") para os perfis atuais. */
 export function normalizeRole(role: string | undefined): UserRole {
-  return role === 'admin' || role === 'analista' ? 'admin' : 'usuario'
+  if (role === 'admin' || role === 'analista') return 'admin'
+  if (role === 'coordenador') return 'coordenador'
+  return 'usuario'
 }
 
 /** Perfil da equipe de suporte (atende chamados). Aceita perfis antigos salvos. */
 export function isStaffRole(role: string | undefined): boolean {
   return normalizeRole(role) === 'admin'
+}
+
+/** Coordenador de setor (acompanha os chamados do próprio departamento). */
+export function isCoordinatorRole(role: string | undefined): boolean {
+  return normalizeRole(role) === 'coordenador'
 }
 
 export interface User {
@@ -42,6 +53,10 @@ export interface User {
   createdAt?: string
   /** Quando os dados pessoais foram removidos (a conta fica só como histórico). */
   anonymizedAt?: string
+  /** Última mudança de perfil feita por um administrador (quem e quando), para controle. */
+  roleChangedAt?: string
+  roleChangedByName?: string
+  roleChangedByEmail?: string
 }
 
 export type RegisterData = Pick<User, 'name' | 'email' | 'cpf' | 'department'> & {
@@ -101,6 +116,10 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => !!currentUser.value && isStaffRole(currentUser.value.role))
   /** Mesmo que `isAdmin` (analista e administrador são o mesmo perfil). */
   const isAnalyst = isAdmin
+  /** Coordenadores: acompanham os chamados do próprio setor. */
+  const isCoordinator = computed(
+    () => !!currentUser.value && isCoordinatorRole(currentUser.value.role),
+  )
 
   function setSession(user: User | null) {
     currentUser.value = user
@@ -167,6 +186,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     isAnalyst,
     isAdmin,
+    isCoordinator,
     register,
     login,
     refreshSession,
