@@ -9,6 +9,7 @@ import {
   useSidebarSize,
 } from '@/composables/useSidebarSize'
 import { ROLE_LABELS, useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
 import { initials } from '@/utils/user'
 
 const auth = useAuthStore()
@@ -27,6 +28,15 @@ const sidebarWidth = computed(() => `${collapsed.value ? SIDEBAR_COLLAPSED : wid
 const tip = (label: string) => (collapsed.value ? label : undefined)
 
 const userInitials = computed(() => initials(auth.currentUser?.name ?? ''))
+
+// Notificações não lidas do coordenador (chamados abertos por alguém do setor).
+const notifications = useNotificationsStore()
+const unread = computed(() =>
+  auth.currentUser ? notifications.unreadCount(auth.currentUser.email) : 0,
+)
+const unreadLabel = computed(() =>
+  unread.value === 1 ? '1 notificação não lida' : `${unread.value} notificações não lidas`,
+)
 
 const subtitle = computed(() =>
   [auth.currentUser?.department, auth.currentUser && ROLE_LABELS[auth.currentUser.role]]
@@ -109,6 +119,20 @@ const subtitle = computed(() =>
           <span class="sidebar__label">Chamados que abri</span>
         </RouterLink>
 
+        <p class="sidebar__section">Acompanhamento</p>
+        <RouterLink
+          :to="{ name: 'all-tickets' }"
+          class="sidebar__link"
+          :title="tip('Todos os chamados')"
+          active-class="sidebar__link--active"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M3 9h18M8 13h8M8 17h5" />
+          </svg>
+          <span class="sidebar__label">Todos os chamados</span>
+        </RouterLink>
+
         <p class="sidebar__section">Administração</p>
         <RouterLink
           :to="{ name: 'metrics' }"
@@ -164,6 +188,38 @@ const subtitle = computed(() =>
           </svg>
           <span class="sidebar__label">Meus chamados</span>
         </RouterLink>
+        <!-- Coordenador: acompanha o setor e recebe avisos -->
+        <template v-if="auth.isCoordinator">
+          <RouterLink
+            :to="{ name: 'all-tickets' }"
+            class="sidebar__link"
+            :title="tip('Chamados do setor')"
+            active-class="sidebar__link--active"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M3 9h18M8 13h8M8 17h5" />
+            </svg>
+            <span class="sidebar__label">Chamados do setor</span>
+          </RouterLink>
+          <RouterLink
+            :to="{ name: 'notifications' }"
+            class="sidebar__link"
+            :title="tip(unreadLabel)"
+            active-class="sidebar__link--active"
+          >
+            <span class="sidebar__icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" />
+              </svg>
+              <span v-if="unread" class="sidebar__badge" aria-hidden="true">{{
+                unread > 9 ? '9+' : unread
+              }}</span>
+            </span>
+            <span class="sidebar__label">Notificações</span>
+            <span class="sr-only">{{ unread ? `, ${unreadLabel.toLowerCase()}` : '' }}</span>
+          </RouterLink>
+        </template>
         <RouterLink
           :to="{ name: 'profile' }"
           class="sidebar__link"
@@ -435,6 +491,30 @@ const subtitle = computed(() =>
 .sidebar__link svg {
   width: 20px;
   height: 20px;
+}
+
+/* Ícone com contador (notificações) */
+.sidebar__icon {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+}
+
+.sidebar__badge {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 2px solid var(--navy-800);
+  border-radius: 999px;
+  background: var(--orange-500);
+  color: var(--navy-900);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
 }
 
 .sidebar svg {

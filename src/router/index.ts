@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { canBrowseTickets } from '@/utils/ticketScope'
 import AppLayout from '../components/AppLayout.vue'
 import MyTicketsView from '../views/MyTicketsView.vue'
 
@@ -19,6 +20,19 @@ const router = createRouter({
           component: MyTicketsView,
           props: { mine: true },
           meta: { analystOnly: true },
+        },
+        {
+          // Administrador: todos os chamados. Coordenador: os chamados do setor.
+          path: 'chamados/todos',
+          name: 'all-tickets',
+          component: () => import('../views/AllTicketsView.vue'),
+          meta: { browseOnly: true },
+        },
+        {
+          path: 'notificacoes',
+          name: 'notifications',
+          component: () => import('../views/NotificationsView.vue'),
+          meta: { coordinatorOnly: true },
         },
         {
           path: 'chamados/novo',
@@ -88,6 +102,12 @@ router.beforeEach((to) => {
     return { name: 'tickets' }
   }
   if (to.meta.adminOnly && !auth.isAdmin) {
+    return { name: 'tickets' }
+  }
+  if (to.meta.browseOnly && !canBrowseTickets(auth.currentUser)) {
+    return { name: 'tickets' }
+  }
+  if (to.meta.coordinatorOnly && !auth.isCoordinator) {
     return { name: 'tickets' }
   }
 })

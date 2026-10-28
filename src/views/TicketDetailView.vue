@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -12,10 +12,13 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useAuthStore } from '@/stores/auth'
 import { formatTicketNumber, useTicketsStore, type TicketResolution } from '@/stores/tickets'
 import { useUsersStore } from '@/stores/users'
+import { useNotificationsStore } from '@/stores/notifications'
 import { formatDateTime, formatDuration } from '@/utils/format'
+import { canViewTicket, isCoordinatorWatching } from '@/utils/ticketScope'
 import { initials } from '@/utils/user'
 
 const auth = useAuthStore()
+const notifications = useNotificationsStore()
 const categories = useCategoriesStore()
 const tickets = useTicketsStore()
 const users = useUsersStore()
@@ -23,12 +26,42 @@ const route = useRoute()
 
 const ticket = computed(() => {
   const found = tickets.ticketById(Number(route.params.id))
-  // Usuários só veem os próprios chamados; analistas veem todos.
-  if (!found || (!auth.isAnalyst && found.authorEmail !== auth.currentUser?.email)) return null
+  // Usuários veem os próprios chamados; coordenadores, também os do setor; analistas, todos.
+  if (!found || !canViewTicket(auth.currentUser, found)) return null
   return found
 })
 
-const listLabel = computed(() => (auth.isAnalyst ? 'Atendimentos' : 'Meus chamados'))
+/** Coordenador acompanhando o chamado de alguém do setor: só leitura, e a visita fica registrada. */
+const watching = computed(
+  () => !!ticket.value && isCoordinatorWatching(auth.currentUser, ticket.value),
+)
+
+// Ao abrir, registra a visualização (só a primeira vez) e marca o aviso como lido.
+watch(
+  () => ticket.value?.id,
+  (id) => {
+    if (!id || !auth.currentUser) return
+    notifications.markTicketRead(auth.currentUser.email, id)
+    if (watching.value) tickets.recordView(id, auth.currentUser)
+  },
+  { immediate: true },
+)
+
+const backLink = computed(() =>
+  watching.value
+    ? { label: 'Chamados do setor', to: { name: 'all-tickets' } }
+    : { label: auth.isAnalyst ? 'Atendimentos' : 'Meus chamados', to: { name: 'tickets' } },
+)
+const listLabel = computed(() => backLink.value.label)
+
+/** Quem da coordenação já viu o chamado (mostrado para todos que acessam o chamado). */
+const coordinationViews = computed(() =>
+  (ticket.value?.views ?? []).map((v) => ({
+    ...v,
+    when: formatDateTime(v.viewedAt),
+    isMe: v.email === auth.currentUser?.email,
+  })),
+)
 const justCreated = computed(() => route.query.novo !== undefined)
 const priority = computed(() => ticket.value && priorityById(ticket.value.priority))
 const canManage = computed(() => auth.isAnalyst && ticket.value?.status !== 'resolvido')
@@ -112,7 +145,7 @@ function confirmResolve(resolution: TicketResolution) {
 
 <template>
   <nav class="breadcrumb" aria-label="Você está em">
-    <RouterLink :to="{ name: 'tickets' }">{{ listLabel }}</RouterLink>
+    <RouterLink :to="backLink.to">{{ listLabel }}</RouterLink>
     <span aria-hidden="true">/</span>
     <span aria-current="page" class="breadcrumb__current">
       {{ ticket ? formatTicketNumber(ticket.id) : 'Chamado' }}
@@ -132,6 +165,19 @@ function confirmResolve(resolution: TicketResolution) {
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
       Chamado <strong>{{ formatTicketNumber(ticket.id) }}</strong> aberto. A equipe do setor
       {{ ticket.sector }} já foi avisada e pode falar com você por aqui.
+    </div>
+
+    <div v-if="watching" class="watching" role="note">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      <span>
+        Você está acompanhando este chamado como coordenação de
+        <strong>{{ auth.currentUser?.department }}</strong
+        >. A conversa é entre o solicitante e a equipe de atendimento;
+        {{ ticket.authorName ?? 'o solicitante' }} vê que você visualizou.
+      </span>
     </div>
 
     <header class="head">
@@ -215,7 +261,7 @@ function confirmResolve(resolution: TicketResolution) {
 
         <RatingCard v-if="ticket.status === 'resolvido'" :ticket="ticket" />
 
-        <TicketChat :ticket="ticket" />
+        <TicketChat :ticket="ticket" :readonly="watching" />
       </div>
 
       <aside class="side">
@@ -242,6 +288,21 @@ function confirmResolve(resolution: TicketResolution) {
               <dd :class="{ 'times__value--highlight': item.highlight }">{{ item.value }}</dd>
             </div>
           </dl>
+        </section>
+
+        <section v-if="coordinationViews.length" class="card block views">
+          <h2 class="block__label">Visualizado pela coordenação</h2>
+          <ul>
+            <li v-for="v in coordinationViews" :key="v.email">
+              <span class="avatar avatar--coordenador" aria-hidden="true">{{
+                initials(v.name)
+              }}</span>
+              <span class="person__who">
+                <strong>{{ v.name }}<template v-if="v.isMe"> (você)</template></strong>
+                <small>{{ v.department }} · {{ v.when }}</small>
+              </span>
+            </li>
+          </ul>
         </section>
       </aside>
     </div>
@@ -504,6 +565,50 @@ function confirmResolve(resolution: TicketResolution) {
 
 .avatar--analista {
   background: var(--orange-500);
+}
+
+.avatar--coordenador {
+  background: #e8f0ff;
+}
+
+/* Aviso: coordenador acompanhando o chamado de alguém do setor */
+.watching {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid #cddcf7;
+  border-radius: 10px;
+  background: #f1f6ff;
+  color: var(--navy-800);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.watching svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.views ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.views li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .person__who {

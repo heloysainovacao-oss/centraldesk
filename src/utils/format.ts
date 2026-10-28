@@ -36,6 +36,21 @@ export function formatRelativeDay(iso: string, now = new Date()): string {
     : formatShortTime(iso, now)
 }
 
+/** Há quanto tempo: "agora", "há 12 min", "há 3 h", "ontem" ou "25/10". */
+export function formatTimeAgo(iso: string, now = new Date()): string {
+  const value = new Date(iso)
+  const minutes = Math.floor((now.getTime() - value.getTime()) / 60000)
+  if (minutes < 1) return 'agora'
+  if (minutes < 60) return `há ${minutes} min`
+  if (minutes < 24 * 60 && value.toDateString() === now.toDateString()) {
+    return `há ${Math.floor(minutes / 60)} h`
+  }
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (value.toDateString() === yesterday.toDateString()) return 'ontem'
+  return value.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
+
 /** Duração legível: "14 min", "2 h 5 min", "3 d 4 h". */
 export function formatDuration(ms: number): string {
   const minutes = Math.max(0, Math.round(ms / 60000))

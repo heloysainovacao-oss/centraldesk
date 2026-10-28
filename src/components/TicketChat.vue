@@ -5,7 +5,8 @@ import { useTicketsStore, type Ticket, type TicketMessage } from '@/stores/ticke
 import { formatRelativeDay, formatShortTime } from '@/utils/format'
 import { initials } from '@/utils/user'
 
-const props = defineProps<{ ticket: Ticket }>()
+// `readonly`: quem só acompanha (coordenação do setor) lê a conversa, mas não escreve.
+const props = defineProps<{ ticket: Ticket; readonly?: boolean }>()
 
 const auth = useAuthStore()
 const tickets = useTicketsStore()
@@ -16,7 +17,7 @@ const threadEl = ref<HTMLElement | null>(null)
 
 const messages = computed(() => tickets.messagesFor(props.ticket.id))
 const isClosed = computed(() => props.ticket.status === 'resolvido')
-const canSend = computed(() => draft.value.trim().length > 0 && !isClosed.value)
+const canSend = computed(() => draft.value.trim().length > 0 && !isClosed.value && !props.readonly)
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const shortcut = isMac ? '⌘ + Enter' : 'Ctrl + Enter'
 const placeholder = computed(() =>
@@ -103,6 +104,9 @@ watch(
     </div>
 
     <p v-if="isClosed" class="chat__closed">Chamado encerrado. A conversa foi finalizada.</p>
+    <p v-else-if="readonly" class="chat__closed">
+      Você acompanha esta conversa como coordenação do setor e não pode enviar mensagens.
+    </p>
     <form v-else class="composer" @submit.prevent="send">
       <label :for="inputId" class="composer__label">Novo comentário</label>
       <textarea
